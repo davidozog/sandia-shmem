@@ -34,6 +34,7 @@ char *coll_type_str[] = { "AUTO",
                           "LINEAR",
                           "TREE",
                           "DISSEM",
+                          "TRIGGER",
                           "RING",
                           "RECDBL" };
 
@@ -169,6 +170,8 @@ shmem_internal_collectives_init(int requested_crossover,
             shmem_internal_barrier_type = TREE;
         } else if (0 == strcmp(type, "dissem")) {
             shmem_internal_barrier_type = DISSEM;
+        } else if (0 == strcmp(type, "trigger")) {
+            shmem_internal_barrier_type = TRIGGER;
         } else {
             fprintf(stderr, "[%03d] Bad barrier algorithm %s\n",
                     shmem_internal_my_pe, type);
@@ -406,6 +409,91 @@ shmem_internal_barrier_dissem(int PE_start, int logPE_stride, int PE_size, long 
         shmem_internal_atomic_small(&pSync_ints[i], &neg_one, sizeof(int),
                                     shmem_internal_my_pe,
                                     SHM_INTERNAL_SUM, SHM_INTERNAL_INT);
+    }
+}
+
+void
+shmem_internal_barrier_trigger(int PE_start, int logPE_stride, int PE_size, long *pSync)
+{
+    long zero = 0, one = 1;
+    int stride = 1 << logPE_stride;
+    int parent, num_children, *children;
+
+    /* need 1 slot */
+    shmem_internal_assert(SHMEM_BARRIER_SYNC_SIZE >= 1);
+
+    shmem_internal_quiet();
+
+    if (PE_size == shmem_internal_num_pes) {
+        /* we're the full tree, use the binomial tree */
+        parent = full_tree_parent;
+        num_children = full_tree_num_children;
+        children = full_tree_children;
+    } else {
+        children = alloca(sizeof(int) * tree_radix);
+        shmem_internal_build_kary_tree(tree_radix, PE_start, stride, PE_size,
+                                       0, &parent, &num_children, children);
+    }
+
+    if (num_children != 0) {
+        /* Not a pure leaf node */
+        int i;
+
+        /* wait for num_children callins up the tree */
+        SHMEM_WAIT_UNTIL(pSync, SHMEM_CMP_EQ, num_children);
+
+        if (parent == shmem_internal_my_pe) {
+            /* The root of the tree */
+
+            /* Clear pSync */
+            shmem_internal_put_small(pSync, &zero, sizeof(zero), 
+                                     shmem_internal_my_pe);
+            SHMEM_WAIT_UNTIL(pSync, SHMEM_CMP_EQ, 0);
+
+            /* Send acks down to children */
+            for (i = 0 ; i < num_children ; ++i) {
+                shmem_internal_atomic_small(pSync, &one, sizeof(one), 
+                                            children[i], 
+                                            SHM_INTERNAL_SUM, SHM_INTERNAL_LONG);
+            }
+
+        } else {
+            /* Middle of the tree */
+
+            /* send ack to parent */
+            shmem_internal_atomic_small(pSync, &one, sizeof(one), 
+                                        parent, SHM_INTERNAL_SUM, SHM_INTERNAL_LONG);
+
+            /* wait for ack from parent */
+            SHMEM_WAIT_UNTIL(pSync, SHMEM_CMP_EQ, num_children  + 1);
+
+            /* Clear pSync */
+            shmem_internal_put_small(pSync, &zero, sizeof(zero), 
+                                     shmem_internal_my_pe);
+            SHMEM_WAIT_UNTIL(pSync, SHMEM_CMP_EQ, 0);
+
+            /* Send acks down to children */
+            for (i = 0 ; i < num_children ; ++i) {
+                shmem_internal_atomic_small(pSync, &one, sizeof(one),
+                                            children[i], 
+                                            SHM_INTERNAL_SUM, SHM_INTERNAL_LONG);
+            }
+        }
+
+    } else {
+        /* Leaf node */
+
+        /* send message up psync tree */
+        shmem_internal_atomic_small(pSync, &one, sizeof(one), parent, 
+                                    SHM_INTERNAL_SUM, SHM_INTERNAL_LONG);
+
+        /* wait for ack down psync tree */
+        SHMEM_WAIT(pSync, 0);
+
+        /* Clear pSync */
+        shmem_internal_put_small(pSync, &zero, sizeof(zero), 
+                                 shmem_internal_my_pe);
+        SHMEM_WAIT_UNTIL(pSync, SHMEM_CMP_EQ, 0);
     }
 }
 
