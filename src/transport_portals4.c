@@ -101,6 +101,7 @@ ptl_size_t shmem_transport_portals4_max_fetch_atomic_size = 0;
 ptl_size_t shmem_transport_portals4_max_msg_size = 0;
 
 ptl_size_t shmem_transport_portals4_pending_put_counter = 0;
+ptl_size_t shmem_transport_portals4_pending_triggered_put_counter = 0;
 ptl_size_t shmem_transport_portals4_pending_get_counter = 0;
 
 int32_t shmem_transport_portals4_event_slots = 2048;
