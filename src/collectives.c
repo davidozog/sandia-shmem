@@ -415,14 +415,38 @@ shmem_internal_barrier_dissem(int PE_start, int logPE_stride, int PE_size, long 
 void
 shmem_internal_barrier_trigger(int PE_start, int logPE_stride, int PE_size, long *pSync)
 {
-    long zero = 0, one = 1;
+    long one = 1;
     int stride = 1 << logPE_stride;
     int parent, num_children, *children;
 
-    /* need 1 slot */
-    shmem_internal_assert(SHMEM_BARRIER_SYNC_SIZE >= 1);
-
     shmem_internal_quiet();
+
+    /* TODO: move to transport initialization */
+    /* Create a new PT entry */
+    ptl_pt_index_t  pt_idx;
+    PtlPTAlloc(shmem_transport_portals4_ni_h, 0, PTL_EQ_NONE, PTL_PT_ANY, &pt_idx);
+
+    /* Initialize an LE with a counter */
+    ptl_le_t value_le;
+    ptl_handle_le_t value_le_handle;
+    long local_value;
+
+    local_value = 0;
+    value_le.start = &value_le;
+    value_le.length = sizeof(local_value);
+    value_le.uid = PTL_UID_ANY;
+    value_le.options = (PTL_LE_OP_PUT | PTL_LE_EVENT_CT_COMM);
+
+    PtlCTAlloc(shmem_transport_portals4_ni_h, &value_le.ct_handle);
+    PtlLEAppend(shmem_transport_portals4_ni_h, pt_idx, &value_le, \
+                PTL_PRIORITY_LIST, NULL, &value_le_handle);
+
+    ptl_ct_event_t test;
+    PtlCTGet(value_le.ct_handle, &test);
+    if (test.failure != 0) {
+        printf("%02d: test.success = %ld\n", shmem_internal_my_pe, test.success);
+        printf("%02d: test.failure = %ld\n", shmem_internal_my_pe, test.failure);
+    }
 
     if (PE_size == shmem_internal_num_pes) {
         /* we're the full tree, use the binomial tree */
@@ -439,62 +463,63 @@ shmem_internal_barrier_trigger(int PE_start, int logPE_stride, int PE_size, long
         /* Not a pure leaf node */
         int i;
 
-        /* wait for num_children callins up the tree */
-        SHMEM_WAIT_UNTIL(pSync, SHMEM_CMP_EQ, num_children);
-
         if (parent == shmem_internal_my_pe) {
             /* The root of the tree */
 
-            /* Clear pSync */
-            shmem_internal_put_small(pSync, &zero, sizeof(zero), 
-                                     shmem_internal_my_pe);
-            SHMEM_WAIT_UNTIL(pSync, SHMEM_CMP_EQ, 0);
-
-            /* Send acks down to children */
+            /* Setup triggered acks down to children */
             for (i = 0 ; i < num_children ; ++i) {
-                shmem_internal_atomic_small(pSync, &one, sizeof(one), 
-                                            children[i], 
-                                            SHM_INTERNAL_SUM, SHM_INTERNAL_LONG);
+                shmem_internal_triggered_atomic_small(pt_idx, &one, sizeof(one), 
+                                                      children[i],
+                                                      SHM_INTERNAL_SUM,
+                                                      SHM_INTERNAL_LONG,
+                                                      value_le.ct_handle,
+                                                      num_children);
             }
+            shmem_ptl_ct_wait(&value_le.ct_handle, num_children);
 
         } else {
             /* Middle of the tree */
 
-            /* send ack to parent */
-            shmem_internal_atomic_small(pSync, &one, sizeof(one), 
-                                        parent, SHM_INTERNAL_SUM, SHM_INTERNAL_LONG);
+            /* Setup triggered ack to parent */
+            shmem_internal_triggered_atomic_small(pt_idx, &one, sizeof(one), 
+                                                  parent,
+                                                  SHM_INTERNAL_SUM,
+                                                  SHM_INTERNAL_LONG,
+                                                  value_le.ct_handle,
+                                                  num_children);
 
-            /* wait for ack from parent */
-            SHMEM_WAIT_UNTIL(pSync, SHMEM_CMP_EQ, num_children  + 1);
-
-            /* Clear pSync */
-            shmem_internal_put_small(pSync, &zero, sizeof(zero), 
-                                     shmem_internal_my_pe);
-            SHMEM_WAIT_UNTIL(pSync, SHMEM_CMP_EQ, 0);
-
-            /* Send acks down to children */
+            /* Setup triggered acks down to children */
             for (i = 0 ; i < num_children ; ++i) {
-                shmem_internal_atomic_small(pSync, &one, sizeof(one),
-                                            children[i], 
-                                            SHM_INTERNAL_SUM, SHM_INTERNAL_LONG);
+                shmem_internal_triggered_atomic_small(pt_idx, &one, sizeof(one),
+                                            children[i],
+                                            SHM_INTERNAL_SUM,
+                                            SHM_INTERNAL_LONG,
+                                            value_le.ct_handle, num_children+1);
             }
+
+            shmem_ptl_ct_wait(&value_le.ct_handle, num_children+1);
         }
 
     } else {
         /* Leaf node */
 
-        /* send message up psync tree */
-        shmem_internal_atomic_small(pSync, &one, sizeof(one), parent, 
-                                    SHM_INTERNAL_SUM, SHM_INTERNAL_LONG);
-
-        /* wait for ack down psync tree */
-        SHMEM_WAIT(pSync, 0);
-
-        /* Clear pSync */
-        shmem_internal_put_small(pSync, &zero, sizeof(zero), 
-                                 shmem_internal_my_pe);
-        SHMEM_WAIT_UNTIL(pSync, SHMEM_CMP_EQ, 0);
+        /* Send message up the tree now (trigger at zero) */
+        shmem_internal_triggered_atomic_small(pt_idx, &one, sizeof(one), parent, 
+                                              SHM_INTERNAL_SUM, SHM_INTERNAL_LONG,
+                                              value_le.ct_handle, 0);
+        shmem_ptl_ct_wait(&value_le.ct_handle, 1);
     }
+
+    int ret = shmem_transport_trigger_quiet();
+    if (ret == -1) {
+        RAISE_ERROR_MSG("Failed to quiet triggered ops (ret: %d\n", ret);
+    }
+
+    /* TODO: move to transport finalization */
+    /* Cleanup */
+    PtlCTFree(value_le.ct_handle);
+    PtlLEUnlink(value_le_handle);
+    PtlPTFree(shmem_transport_portals4_ni_h, pt_idx);
 }
 
 

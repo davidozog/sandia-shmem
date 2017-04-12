@@ -211,6 +211,13 @@ shmem_internal_atomic_small(void *target, const void *source, size_t len,
     shmem_transport_atomic_small(target, source, len, pe, op, datatype);
 }
 
+static inline
+void
+shmem_internal_triggered_atomic_small(ptl_pt_index_t pt_idx, const void *source, size_t len,
+			   int pe, shm_internal_op_t op, shm_internal_datatype_t datatype, ptl_handle_ct_t ct, long threshold)
+{
+    shmem_transport_triggered_atomic_small(pt_idx, source, len, pe, op, datatype, ct, threshold);
+}
 
 static inline
 void

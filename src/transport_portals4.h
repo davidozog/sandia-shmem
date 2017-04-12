@@ -72,10 +72,14 @@ extern ptl_handle_md_t shmem_transport_portals4_put_volatile_md_h;
 extern ptl_handle_md_t shmem_transport_portals4_put_cntr_md_h;
 extern ptl_handle_md_t shmem_transport_portals4_put_event_md_h;
 extern ptl_handle_md_t shmem_transport_portals4_get_md_h;
+
+extern ptl_handle_md_t shmem_transport_portals4_triggered_put_md_h;
+
 #ifndef ENABLE_HARD_POLLING
 extern ptl_handle_ct_t shmem_transport_portals4_target_ct_h;
 #endif
 extern ptl_handle_ct_t shmem_transport_portals4_put_ct_h;
+extern ptl_handle_ct_t shmem_transport_portals4_triggered_put_ct_h;
 extern ptl_handle_ct_t shmem_transport_portals4_get_ct_h;
 extern ptl_handle_eq_t shmem_transport_portals4_eq_h;
 
@@ -90,6 +94,7 @@ extern ptl_size_t shmem_transport_portals4_max_fence_size;
 extern ptl_size_t shmem_transport_portals4_max_msg_size;
 
 extern ptl_size_t shmem_transport_portals4_pending_put_counter;
+extern ptl_size_t shmem_transport_portals4_pending_triggered_put_counter;
 extern ptl_size_t shmem_transport_portals4_pending_get_counter;
 
 extern int32_t shmem_transport_portals4_event_slots;
@@ -262,6 +267,25 @@ shmem_transport_quiet(void)
     /* wait for remote completion (acks) of all pending put events */
     ret = PtlCTWait(shmem_transport_portals4_put_ct_h, 
                     shmem_transport_portals4_pending_put_counter, &ct);
+    if (PTL_OK != ret) { return ret; }
+    if (ct.failure != 0) { return -1; }
+
+    return 0;
+}
+
+static inline
+int
+shmem_transport_trigger_quiet(void)
+{
+    int ret;
+    ptl_ct_event_t ct;
+
+    /* synchronize the atomic cache, if there is one */
+    PtlAtomicSync();
+
+    /* wait for remote completion (acks) of all pending put events */
+    ret = PtlCTWait(shmem_transport_portals4_triggered_put_ct_h,
+                    shmem_transport_portals4_pending_triggered_put_counter, &ct);
     if (PTL_OK != ret) { return ret; }
     if (ct.failure != 0) { return -1; }
 
@@ -868,6 +892,41 @@ shmem_transport_atomic_small(void *target, const void *source, size_t len,
     shmem_transport_portals4_pending_put_counter += 1;
 }
 
+static inline
+void
+shmem_transport_triggered_atomic_small(ptl_pt_index_t pt, const void *source, size_t len,
+                                       int pe, ptl_op_t op, ptl_datatype_t datatype, ptl_handle_ct_t ct, long threshold)
+{
+    int ret;
+    long offset = 0;
+    ptl_process_t peer;
+
+    shmem_transport_portals4_fence_complete();
+
+    peer.rank = pe;
+
+    shmem_internal_assert(len <= shmem_transport_portals4_max_volatile_size);
+
+    shmem_transport_portals4_fence_complete();
+
+    ret = PtlTriggeredAtomic(shmem_transport_portals4_triggered_put_md_h,
+                    (ptl_size_t) source,
+                    len,
+                    PTL_OC_ACK_REQ,
+                    peer,
+                    pt,
+                    0,
+                    offset,
+                    NULL,
+                    0,
+                    op,
+                    datatype,
+                    ct,
+                    (ptl_size_t) threshold);
+    if (PTL_OK != ret) { RAISE_ERROR(ret); }
+    shmem_transport_portals4_pending_triggered_put_counter += 1;
+}
+
 
 static inline
 void
@@ -1247,6 +1306,20 @@ void shmem_transport_ct_wait(shmem_transport_ct_t *ct, long wait_for)
     }
 }
 
+static inline
+void shmem_ptl_ct_wait(ptl_handle_ct_t *ct, long wait_for)
+{
+    int ret;
+    ptl_ct_event_t ev;
+
+    ret = PtlCTWait(*ct, (ptl_size_t) wait_for, &ev);
+    if (PTL_OK != ret) { RAISE_ERROR(ret); }
+
+    /* TODO: Handle failures gracefully, instead of aborting */
+    if (ev.failure != (ptl_size_t) 0 || ev.success < (ptl_size_t) wait_for) {
+        RAISE_ERROR(ret);
+    }
+}
 
 static inline
 uint64_t shmem_transport_received_cntr_get(void)
