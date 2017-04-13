@@ -39,6 +39,8 @@ int main( int argc, char** argv ) {
 
   shmem_barrier_all();
 
+  printf("PE %d of %d entering finalize\n", my_pe, npes);
+
   shmem_finalize();
 
   printf("PE %d of %d is out of finalize\n", my_pe, npes);

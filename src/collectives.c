@@ -420,6 +420,10 @@ shmem_internal_barrier_trigger(int PE_start, int logPE_stride, int PE_size, long
     int parent, num_children, *children;
 
     shmem_internal_quiet();
+    int ret = shmem_transport_trigger_quiet();
+    if (ret == -1) {
+        RAISE_ERROR_MSG("Failed to quiet triggered ops (ret: %d\n", ret);
+    }
 
     /* Initialize a counter */
     //shmemx_ct_t *ct = (shmemx_ct_t *)malloc(sizeof(shmemx_ct_t));
@@ -488,7 +492,7 @@ shmem_internal_barrier_trigger(int PE_start, int logPE_stride, int PE_size, long
         shmem_internal_ct_wait(ct, 1);
     }
 
-    int ret = shmem_transport_trigger_quiet();
+    ret = shmem_transport_trigger_quiet();
     if (ret == -1) {
         RAISE_ERROR_MSG("Failed to quiet triggered ops (ret: %d\n", ret);
     }
