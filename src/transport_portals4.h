@@ -894,8 +894,9 @@ shmem_transport_atomic_small(void *target, const void *source, size_t len,
 
 static inline
 void
-shmem_transport_triggered_atomic_small(ptl_pt_index_t pt, const void *source, size_t len,
-                                       int pe, ptl_op_t op, ptl_datatype_t datatype, ptl_handle_ct_t ct, long threshold)
+shmem_transport_triggered_atomic_small(const void *source, size_t len,
+                                       int pe, ptl_op_t op, ptl_datatype_t datatype, 
+                                       shmem_transport_ct_t *ct, long threshold)
 {
     int ret;
     long offset = 0;
@@ -914,14 +915,14 @@ shmem_transport_triggered_atomic_small(ptl_pt_index_t pt, const void *source, si
                     len,
                     PTL_OC_ACK_REQ,
                     peer,
-                    pt,
+                    ct->data_pt,
                     0,
                     offset,
                     NULL,
                     0,
                     op,
                     datatype,
-                    ct,
+                    ct->ct,
                     (ptl_size_t) threshold);
     if (PTL_OK != ret) { RAISE_ERROR(ret); }
     shmem_transport_portals4_pending_triggered_put_counter += 1;
@@ -1306,20 +1307,6 @@ void shmem_transport_ct_wait(shmem_transport_ct_t *ct, long wait_for)
     }
 }
 
-static inline
-void shmem_ptl_ct_wait(ptl_handle_ct_t *ct, long wait_for)
-{
-    int ret;
-    ptl_ct_event_t ev;
-
-    ret = PtlCTWait(*ct, (ptl_size_t) wait_for, &ev);
-    if (PTL_OK != ret) { RAISE_ERROR(ret); }
-
-    /* TODO: Handle failures gracefully, instead of aborting */
-    if (ev.failure != (ptl_size_t) 0 || ev.success < (ptl_size_t) wait_for) {
-        RAISE_ERROR(ret);
-    }
-}
 
 static inline
 uint64_t shmem_transport_received_cntr_get(void)

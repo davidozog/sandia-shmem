@@ -421,32 +421,10 @@ shmem_internal_barrier_trigger(int PE_start, int logPE_stride, int PE_size, long
 
     shmem_internal_quiet();
 
-    /* TODO: move to transport initialization */
-    /* Create a new PT entry */
-    ptl_pt_index_t  pt_idx;
-    PtlPTAlloc(shmem_transport_portals4_ni_h, 0, PTL_EQ_NONE, PTL_PT_ANY, &pt_idx);
-
-    /* Initialize an LE with a counter */
-    ptl_le_t value_le;
-    ptl_handle_le_t value_le_handle;
-    long local_value;
-
-    local_value = 0;
-    value_le.start = &value_le;
-    value_le.length = sizeof(local_value);
-    value_le.uid = PTL_UID_ANY;
-    value_le.options = (PTL_LE_OP_PUT | PTL_LE_EVENT_CT_COMM);
-
-    PtlCTAlloc(shmem_transport_portals4_ni_h, &value_le.ct_handle);
-    PtlLEAppend(shmem_transport_portals4_ni_h, pt_idx, &value_le, \
-                PTL_PRIORITY_LIST, NULL, &value_le_handle);
-
-    ptl_ct_event_t test;
-    PtlCTGet(value_le.ct_handle, &test);
-    if (test.failure != 0) {
-        printf("%02d: test.success = %ld\n", shmem_internal_my_pe, test.success);
-        printf("%02d: test.failure = %ld\n", shmem_internal_my_pe, test.failure);
-    }
+    /* Initialize a counter */
+    //shmemx_ct_t *ct = (shmemx_ct_t *)malloc(sizeof(shmemx_ct_t));
+    shmem_transport_ct_t *ct;
+    shmem_internal_ct_create(&ct);
 
     if (PE_size == shmem_internal_num_pes) {
         /* we're the full tree, use the binomial tree */
@@ -468,46 +446,46 @@ shmem_internal_barrier_trigger(int PE_start, int logPE_stride, int PE_size, long
 
             /* Setup triggered acks down to children */
             for (i = 0 ; i < num_children ; ++i) {
-                shmem_internal_triggered_atomic_small(pt_idx, &one, sizeof(one), 
+                shmem_internal_triggered_atomic_small(&one, sizeof(one),
                                                       children[i],
                                                       SHM_INTERNAL_SUM,
                                                       SHM_INTERNAL_LONG,
-                                                      value_le.ct_handle,
+                                                      ct,
                                                       num_children);
             }
-            shmem_ptl_ct_wait(&value_le.ct_handle, num_children);
+            shmem_internal_ct_wait(ct, num_children);
 
         } else {
             /* Middle of the tree */
 
             /* Setup triggered ack to parent */
-            shmem_internal_triggered_atomic_small(pt_idx, &one, sizeof(one), 
+            shmem_internal_triggered_atomic_small(&one, sizeof(one),
                                                   parent,
                                                   SHM_INTERNAL_SUM,
                                                   SHM_INTERNAL_LONG,
-                                                  value_le.ct_handle,
+                                                  ct,
                                                   num_children);
 
             /* Setup triggered acks down to children */
             for (i = 0 ; i < num_children ; ++i) {
-                shmem_internal_triggered_atomic_small(pt_idx, &one, sizeof(one),
+                shmem_internal_triggered_atomic_small(&one, sizeof(one),
                                             children[i],
                                             SHM_INTERNAL_SUM,
                                             SHM_INTERNAL_LONG,
-                                            value_le.ct_handle, num_children+1);
+                                            ct, num_children+1);
             }
 
-            shmem_ptl_ct_wait(&value_le.ct_handle, num_children+1);
+            shmem_internal_ct_wait(ct, num_children+1);
         }
 
     } else {
         /* Leaf node */
 
-        /* Send message up the tree now (trigger at zero) */
-        shmem_internal_triggered_atomic_small(pt_idx, &one, sizeof(one), parent, 
+        /* Send message up the tree immediately (trigger at zero) */
+        shmem_internal_triggered_atomic_small(&one, sizeof(one), parent, 
                                               SHM_INTERNAL_SUM, SHM_INTERNAL_LONG,
-                                              value_le.ct_handle, 0);
-        shmem_ptl_ct_wait(&value_le.ct_handle, 1);
+                                              ct, 0);
+        shmem_internal_ct_wait(ct, 1);
     }
 
     int ret = shmem_transport_trigger_quiet();
@@ -515,11 +493,8 @@ shmem_internal_barrier_trigger(int PE_start, int logPE_stride, int PE_size, long
         RAISE_ERROR_MSG("Failed to quiet triggered ops (ret: %d\n", ret);
     }
 
-    /* TODO: move to transport finalization */
     /* Cleanup */
-    PtlCTFree(value_le.ct_handle);
-    PtlLEUnlink(value_le_handle);
-    PtlPTFree(shmem_transport_portals4_ni_h, pt_idx);
+    shmem_internal_ct_free(&ct);
 }
 
 
