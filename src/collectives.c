@@ -43,6 +43,7 @@ static int full_tree_num_children;
 static int full_tree_parent;
 static int tree_radix = -1;
 
+shmem_transport_ct_t *ct;
 
 static int
 shmem_internal_build_kary_tree(int radix, int PE_start, int stride,
@@ -229,6 +230,8 @@ shmem_internal_collectives_init(int requested_crossover,
                     shmem_internal_my_pe, type);
         }
     }
+
+    shmem_internal_ct_create(&ct);
 
     return 0;
 }
@@ -427,8 +430,6 @@ shmem_internal_barrier_trigger(int PE_start, int logPE_stride, int PE_size, long
 
     /* Initialize a counter */
     //shmemx_ct_t *ct = (shmemx_ct_t *)malloc(sizeof(shmemx_ct_t));
-    shmem_transport_ct_t *ct;
-    shmem_internal_ct_create(&ct);
 
     if (PE_size == shmem_internal_num_pes) {
         /* we're the full tree, use the binomial tree */
@@ -457,7 +458,7 @@ shmem_internal_barrier_trigger(int PE_start, int logPE_stride, int PE_size, long
                                                       ct,
                                                       num_children);
             }
-            shmem_internal_ct_wait(ct, num_children);
+            shmem_internal_triggered_ct_set(ct, num_children, 0);
 
         } else {
             /* Middle of the tree */
@@ -479,7 +480,7 @@ shmem_internal_barrier_trigger(int PE_start, int logPE_stride, int PE_size, long
                                             ct, num_children+1);
             }
 
-            shmem_internal_ct_wait(ct, num_children+1);
+            shmem_internal_triggered_ct_set(ct, num_children+1, 0);
         }
 
     } else {
@@ -489,7 +490,7 @@ shmem_internal_barrier_trigger(int PE_start, int logPE_stride, int PE_size, long
         shmem_internal_triggered_atomic_small(&one, sizeof(one), parent, 
                                               SHM_INTERNAL_SUM, SHM_INTERNAL_LONG,
                                               ct, 0);
-        shmem_internal_ct_wait(ct, 1);
+        shmem_internal_triggered_ct_set(ct, 1, 0);
     }
 
     ret = shmem_transport_trigger_quiet();
@@ -497,8 +498,8 @@ shmem_internal_barrier_trigger(int PE_start, int logPE_stride, int PE_size, long
         RAISE_ERROR_MSG("Failed to quiet triggered ops (ret: %d\n", ret);
     }
 
-    /* Cleanup */
-    shmem_internal_ct_free(&ct);
+    /* TODO: Cleanup */
+    //shmem_internal_ct_free(&ct);
 }
 
 

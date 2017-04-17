@@ -1293,6 +1293,20 @@ void shmem_transport_ct_set(shmem_transport_ct_t *ct, long value)
 
 
 static inline
+void shmem_transport_triggered_ct_set(shmem_transport_ct_t *ct, long value, long threshold)
+{
+    int ret;
+    ptl_ct_event_t ev;
+
+    ev.success = (ptl_size_t) value;
+    ev.failure = (ptl_size_t) 0;
+
+    ret = PtlTriggeredCTSet(ct->ct, ev, ct->ct, 0);
+    if (PTL_OK != ret) { RAISE_ERROR(ret); }
+}
+
+
+static inline
 void shmem_transport_ct_wait(shmem_transport_ct_t *ct, long wait_for)
 {
     int ret;

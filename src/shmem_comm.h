@@ -287,6 +287,11 @@ void shmem_internal_ct_set(shmem_transport_ct_t *ct, long value)
     shmem_transport_ct_set(ct, value);
 }
 
+static inline
+void shmem_internal_triggered_ct_set(shmem_transport_ct_t *ct, long value, long threshold)
+{
+    shmem_transport_triggered_ct_set(ct, value, threshold);
+}
 
 static inline
 void shmem_internal_ct_wait(shmem_transport_ct_t *ct, long wait_for)
