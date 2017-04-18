@@ -231,7 +231,9 @@ shmem_internal_collectives_init(int requested_crossover,
         }
     }
 
-    shmem_internal_ct_create(&ct);
+    if (shmem_internal_barrier_type == TRIGGER) {
+        shmem_internal_ct_create(&ct);
+    }
 
     return 0;
 }

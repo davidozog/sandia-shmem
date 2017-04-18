@@ -320,6 +320,11 @@ static inline int shmem_transport_quiet(void)
 	return 0;
 }
 
+static inline int shmem_transport_trigger_quiet(void)
+{
+    RAISE_ERROR_STR("OFI transport does not currently support triggered operations");
+    return -1;
+}
 
 static inline
 int
@@ -708,6 +713,16 @@ shmem_transport_atomic_small(void *target, const void *source, size_t len,
 
 static inline
 void
+shmem_transport_triggered_atomic_small(const void *source, size_t len,
+                                      int pe, shm_internal_op_t op, shm_internal_datatype_t datatype,
+                                      shmem_transport_ct_t *ct, long threshold)
+{
+    RAISE_ERROR_STR("OFI transport does not currently support triggered operations");
+}
+
+
+static inline
+void
 shmem_transport_atomic_set(void *target, const void *source, size_t len,
                            int pe, int datatype)
 {
@@ -952,6 +967,12 @@ static inline
 void shmem_transport_ct_set(shmem_transport_ct_t *ct, long value)
 {
     RAISE_ERROR_STR("OFI transport does not currently support CT operations");
+}
+
+static inline
+void shmem_transport_triggered_ct_set(shmem_transport_ct_t *ct, long value, long threshold)
+{
+    RAISE_ERROR_STR("OFI transport does not currently support triggered CT operations");
 }
 
 static inline
