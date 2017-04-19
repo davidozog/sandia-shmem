@@ -43,7 +43,7 @@ extern coll_type_t shmem_internal_fcollect_type;
 
 void shmem_internal_barrier_linear(int PE_start, int logPE_stride, int PE_size, long *pSync);
 void shmem_internal_barrier_tree(int PE_start, int logPE_stride, int PE_size, long *pSync);
-void shmem_internal_barrier_trigger(int PE_start, int logPE_stride, int PE_size, long *pSync);
+void shmem_internal_barrier_trigger_tree(int PE_start, int logPE_stride, int PE_size, long *pSync);
 void shmem_internal_barrier_dissem(int PE_start, int logPE_stride, int PE_size, long *pSync);
 
 static inline
@@ -68,7 +68,7 @@ shmem_internal_barrier(int PE_start, int logPE_stride, int PE_size, long *pSync)
         shmem_internal_barrier_dissem(PE_start, logPE_stride, PE_size, pSync);
         break;
     case TRIGGER:
-        shmem_internal_barrier_trigger(PE_start, logPE_stride, PE_size, pSync);
+        shmem_internal_barrier_trigger_tree(PE_start, logPE_stride, PE_size, pSync);
         break;
     default:
         fprintf(stderr, "[%03d] Illegal barrier type %d\n",

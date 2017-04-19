@@ -419,7 +419,7 @@ shmem_internal_barrier_dissem(int PE_start, int logPE_stride, int PE_size, long 
 }
 
 void
-shmem_internal_barrier_trigger(int PE_start, int logPE_stride, int PE_size, long *pSync)
+shmem_internal_barrier_trigger_tree(int PE_start, int logPE_stride, int PE_size, long *pSync)
 {
     long one = 1;
     int stride = 1 << logPE_stride;

@@ -892,7 +892,11 @@ shmem_transport_triggered_atomic_small(const void *source, size_t len,
                     len,
                     PTL_OC_ACK_REQ,
                     peer,
+#ifdef ENABLE_REMOTE_VIRTUAL_ADDRESSING
+                    ct->shr_pt,
+#else
                     ct->data_pt,
+#endif
                     0,
                     offset,
                     NULL,
