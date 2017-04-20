@@ -75,7 +75,6 @@ ptl_handle_md_t shmem_transport_portals4_put_volatile_md_h = PTL_INVALID_HANDLE;
 ptl_handle_md_t shmem_transport_portals4_put_cntr_md_h = PTL_INVALID_HANDLE;
 ptl_handle_md_t shmem_transport_portals4_put_event_md_h = PTL_INVALID_HANDLE;
 ptl_handle_md_t shmem_transport_portals4_get_md_h = PTL_INVALID_HANDLE;
-
 #if ENABLE_REMOTE_VIRTUAL_ADDRESSING
 ptl_handle_le_t shmem_transport_portals4_le_h = PTL_INVALID_HANDLE;
 #else

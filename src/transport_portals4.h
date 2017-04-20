@@ -72,7 +72,6 @@ extern ptl_handle_md_t shmem_transport_portals4_put_volatile_md_h;
 extern ptl_handle_md_t shmem_transport_portals4_put_cntr_md_h;
 extern ptl_handle_md_t shmem_transport_portals4_put_event_md_h;
 extern ptl_handle_md_t shmem_transport_portals4_get_md_h;
-
 #ifndef ENABLE_HARD_POLLING
 extern ptl_handle_ct_t shmem_transport_portals4_target_ct_h;
 #endif
