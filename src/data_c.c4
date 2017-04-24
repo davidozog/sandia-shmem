@@ -393,7 +393,6 @@ void shmemx_putmem_ct(shmemx_ct_t ct, void *target, const void *source,
 }
 
 
-
 void shmemx_ct_create(shmemx_ct_t *ct)
 {
     SHMEM_ERR_CHECK_INITIALIZED();

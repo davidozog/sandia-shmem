@@ -260,7 +260,6 @@ shmem_internal_fetch_atomic(void *target, void *source, void *dest, size_t len,
 }
 
 
-
 static inline
 void shmem_internal_ct_create(shmemx_ct_t *ct)
 {
