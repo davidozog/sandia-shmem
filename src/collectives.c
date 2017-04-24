@@ -455,7 +455,7 @@ shmem_internal_barrier_trigger_tree(int PE_start, int logPE_stride, int PE_size,
                                                       children[i],
                                                       SHM_INTERNAL_SUM,
                                                       SHM_INTERNAL_LONG,
-                                                      &ct,
+                                                      ct,
                                                       num_children*nbarriers);
             }
             shmem_internal_ct_wait(ct, num_children*nbarriers);
@@ -468,7 +468,7 @@ shmem_internal_barrier_trigger_tree(int PE_start, int logPE_stride, int PE_size,
                                                   parent,
                                                   SHM_INTERNAL_SUM,
                                                   SHM_INTERNAL_LONG,
-                                                  &ct,
+                                                  ct,
                                                   num_children*nbarriers);
 
             /* Setup triggered acks down to children */
@@ -477,7 +477,7 @@ shmem_internal_barrier_trigger_tree(int PE_start, int logPE_stride, int PE_size,
                                             children[i],
                                             SHM_INTERNAL_SUM,
                                             SHM_INTERNAL_LONG,
-                                            &ct, (num_children+1)*nbarriers);
+                                            ct, (num_children+1)*nbarriers);
             }
             shmem_internal_ct_wait(ct, (num_children+1)*nbarriers);
 
@@ -489,7 +489,7 @@ shmem_internal_barrier_trigger_tree(int PE_start, int logPE_stride, int PE_size,
         /* Send message up the tree immediately (trigger at zero) */
         shmem_internal_triggered_atomic_small(&one, sizeof(one), parent, 
                                               SHM_INTERNAL_SUM, SHM_INTERNAL_LONG,
-                                              &ct, 0);
+                                              ct, 0);
         shmem_internal_ct_wait(ct, nbarriers);
     }
 
