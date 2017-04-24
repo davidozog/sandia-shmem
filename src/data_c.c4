@@ -393,11 +393,12 @@ void shmemx_putmem_ct(shmemx_ct_t ct, void *target, const void *source,
 }
 
 
+
 void shmemx_ct_create(shmemx_ct_t *ct)
 {
     SHMEM_ERR_CHECK_INITIALIZED();
 
-    shmem_internal_ct_create((shmem_transport_ct_t **)ct);
+    shmem_internal_ct_create(ct);
 }
 
 
@@ -405,7 +406,7 @@ void shmemx_ct_free(shmemx_ct_t *ct)
 {
     SHMEM_ERR_CHECK_INITIALIZED();
 
-    shmem_internal_ct_free((shmem_transport_ct_t **)ct);
+    shmem_internal_ct_free(ct);
 }
 
 
@@ -413,7 +414,7 @@ long shmemx_ct_get(shmemx_ct_t ct)
 {
     SHMEM_ERR_CHECK_INITIALIZED();
 
-    return shmem_internal_ct_get((shmem_transport_ct_t *)ct);
+    return shmem_internal_ct_get(ct);
 }
 
 
@@ -421,7 +422,7 @@ void shmemx_ct_set(shmemx_ct_t ct, long value)
 {
     SHMEM_ERR_CHECK_INITIALIZED();
 
-    shmem_internal_ct_set((shmem_transport_ct_t *)ct, value);
+    shmem_internal_ct_set(ct, value);
 }
 
 
@@ -429,5 +430,5 @@ void shmemx_ct_wait(shmemx_ct_t ct, long wait_for)
 {
     SHMEM_ERR_CHECK_INITIALIZED();
 
-    shmem_internal_ct_wait((shmem_transport_ct_t *)ct, wait_for);
+    shmem_internal_ct_wait(ct, wait_for);
 }

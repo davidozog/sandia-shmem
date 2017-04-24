@@ -216,9 +216,9 @@ static inline
 void
 shmem_internal_triggered_atomic_small(const void *source, size_t len,
                                       int pe, shm_internal_op_t op, shm_internal_datatype_t datatype,
-                                      shmem_transport_ct_t *ct, long threshold)
+                                      shmemx_ct_t *ct, long threshold)
 {
-    shmem_transport_triggered_atomic_small(source, len, pe, op, datatype, ct, threshold);
+    shmem_transport_triggered_atomic_small(source, len, pe, op, datatype, (shmem_transport_ct_t **) ct, threshold);
 }
 
 static inline
@@ -260,43 +260,44 @@ shmem_internal_fetch_atomic(void *target, void *source, void *dest, size_t len,
 }
 
 
+
 static inline
-void shmem_internal_ct_create(shmem_transport_ct_t **ct)
+void shmem_internal_ct_create(shmemx_ct_t *ct)
 {
-    shmem_transport_ct_create(ct);
+    shmem_transport_ct_create((shmem_transport_ct_t **) ct);
 }
 
 
 static inline
-void shmem_internal_ct_free(shmem_transport_ct_t **ct)
+void shmem_internal_ct_free(shmemx_ct_t *ct)
 {
-    shmem_transport_ct_free(ct);
+    shmem_transport_ct_free((shmem_transport_ct_t **) ct);
 }
 
 
 static inline
-long shmem_internal_ct_get(shmem_transport_ct_t *ct)
+long shmem_internal_ct_get(shmemx_ct_t ct)
 {
-    return shmem_transport_ct_get(ct);
+    return shmem_transport_ct_get((shmem_transport_ct_t *) ct);
 }
 
 
 static inline
-void shmem_internal_ct_set(shmem_transport_ct_t *ct, long value)
+void shmem_internal_ct_set(shmemx_ct_t ct, long value)
 {
-    shmem_transport_ct_set(ct, value);
+    shmem_transport_ct_set((shmem_transport_ct_t *) ct, value);
 }
 
 static inline
-void shmem_internal_triggered_ct_set(shmem_transport_ct_t *ct, long value, long threshold)
+void shmem_internal_triggered_ct_set(shmemx_ct_t ct, long value, long threshold)
 {
-    shmem_transport_triggered_ct_set(ct, value, threshold);
+    shmem_transport_triggered_ct_set((shmem_transport_ct_t *) ct, value, threshold);
 }
 
 static inline
-void shmem_internal_ct_wait(shmem_transport_ct_t *ct, long wait_for)
+void shmem_internal_ct_wait(shmemx_ct_t ct, long wait_for)
 {
-    shmem_transport_ct_wait(ct, wait_for);
+    shmem_transport_ct_wait((shmem_transport_ct_t *) ct, wait_for);
 }
 
 

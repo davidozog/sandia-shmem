@@ -872,11 +872,13 @@ static inline
 void
 shmem_transport_triggered_atomic_small(const void *source, size_t len,
                                        int pe, ptl_op_t op, ptl_datatype_t datatype, 
-                                       shmem_transport_ct_t *ct, long threshold)
+                                       shmem_transport_ct_t **ct, long threshold)
 {
     int ret;
     long offset = 0;
     ptl_process_t peer;
+
+    shmem_transport_ct_t *myct = *ct;
 
     shmem_transport_portals4_fence_complete();
 
@@ -892,9 +894,9 @@ shmem_transport_triggered_atomic_small(const void *source, size_t len,
                     PTL_OC_ACK_REQ,
                     peer,
 #ifdef ENABLE_REMOTE_VIRTUAL_ADDRESSING
-                    ct->shr_pt,
+                    myct->shr_pt,
 #else
-                    ct->data_pt,
+                    myct->data_pt,
 #endif
                     0,
                     offset,
@@ -902,7 +904,7 @@ shmem_transport_triggered_atomic_small(const void *source, size_t len,
                     0,
                     op,
                     datatype,
-                    ct->ct,
+                    myct->ct,
                     (ptl_size_t) threshold);
     if (PTL_OK != ret) { RAISE_ERROR(ret); }
     shmem_transport_portals4_pending_put_counter += 1;
