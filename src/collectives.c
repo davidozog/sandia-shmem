@@ -72,7 +72,7 @@ shmem_internal_build_kary_tree(int radix, int PE_start, int stride,
     }
 
     if (shmem_internal_debug) {
-        int len;
+        size_t len;
         char debug_str[256];
         len = snprintf(debug_str, sizeof(debug_str), "Building k-ary tree:"
                        "\n\t\tradix=%d, PE_start=%d, stride=%d, PE_size=%d, PE_root=%d\n",
@@ -175,8 +175,7 @@ shmem_internal_collectives_init(int requested_crossover,
         } else if (0 == strcmp(type, "trigger")) {
             shmem_internal_barrier_type = TRIGGER;
         } else {
-            fprintf(stderr, "[%03d] Bad barrier algorithm %s\n",
-                    shmem_internal_my_pe, type);
+            RAISE_WARN_MSG("Ignoring bad barrier algorithm '%s'\n", type);
         }
     }
     if (NULL != (type = shmem_util_getenv_str("BCAST_ALGORITHM"))) {
@@ -187,8 +186,7 @@ shmem_internal_collectives_init(int requested_crossover,
         } else if (0 == strcmp(type, "tree")) {
             shmem_internal_bcast_type = TREE;
         } else {
-            fprintf(stderr, "[%03d] Bad broadcast algorithm %s\n",
-                    shmem_internal_my_pe, type);
+            RAISE_WARN_MSG("Ignoring bad broadcast algorithm '%s'\n", type);
         }
     }
     if (NULL != (type = shmem_util_getenv_str("REDUCE_ALGORITHM"))) {
@@ -201,8 +199,7 @@ shmem_internal_collectives_init(int requested_crossover,
         } else if (0 == strcmp(type, "recdbl")) {
             shmem_internal_reduce_type = RECDBL;
         } else {
-            fprintf(stderr, "[%03d] Bad reduction algorithm %s\n",
-                    shmem_internal_my_pe, type);
+            RAISE_WARN_MSG("Ignoring bad reduction algorithm '%s'\n", type);
         }
     }
     if (NULL != (type = shmem_util_getenv_str("COLLECT_ALGORITHM"))) {
@@ -211,8 +208,7 @@ shmem_internal_collectives_init(int requested_crossover,
         } else if (0 == strcmp(type, "linear")) {
             shmem_internal_collect_type = LINEAR;
         } else {
-            fprintf(stderr, "[%03d] Bad collect algorithm %s\n",
-                    shmem_internal_my_pe, type);
+            RAISE_WARN_MSG("Ignoring bad collect algorithm '%s'\n", type);
         }
     }
     if (NULL != (type = shmem_util_getenv_str("FCOLLECT_ALGORITHM"))) {
@@ -227,8 +223,7 @@ shmem_internal_collectives_init(int requested_crossover,
         } else if (0 == strcmp(type, "recdbl")) {
             shmem_internal_fcollect_type = RECDBL;
         } else {
-            fprintf(stderr, "[%03d] Bad fcollect algorithm %s\n",
-                    shmem_internal_my_pe, type);
+            RAISE_WARN_MSG("Ignoring bad fcollect algorithm '%s'\n", type);
         }
     }
 
