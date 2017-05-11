@@ -887,7 +887,7 @@ shmem_transport_triggered_atomic_small(const void *source, size_t len,
     shmem_transport_portals4_fence_complete();
 
     ret = PtlTriggeredAtomic(shmem_transport_portals4_put_volatile_md_h,
-                    (ptl_size_t) source,
+                    0,
                     len,
                     PTL_OC_ACK_REQ,
                     peer,
