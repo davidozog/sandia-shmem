@@ -78,6 +78,11 @@ AC_ARG_ENABLE([manual-progress],
                     [Enable intermittent progress calls inside transport layer (default:disabled)])])
 AS_IF([test "$enable_manual_progress" = "yes"], [AC_DEFINE([ENABLE_MANUAL_PROGRESS], [1], [Enable manual progress])])
 
+AC_ARG_ENABLE([agressive-progress],
+    [AC_HELP_STRING([--enable-aggressive-progress],
+                    [Enable progress calls inside transport layer to all RMA and AMO routines (default:disabled)])])
+AS_IF([test "$enable_aggressive_progress" = "yes"], [AC_DEFINE([ENABLE_AGGRESSIVE_PROGRESS], [1], [Enable aggressive progress])])
+
 AC_ARG_WITH([total-data-ordering],
     [AC_HELP_STRING([--with-total-data-ordering],
        [Configure handling of total data ordering option.  "no" or "never" to build with the assumption total data ordering will never be available.  "yes" or "always" to build with the assumption total data ordering will always be available (if not, applications will abort in start_pes()).  "check" to build with no assumptions, which may lead to a slight performance decrease on high performance networks.  (default: disabled)])])

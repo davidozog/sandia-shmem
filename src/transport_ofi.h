@@ -552,6 +552,9 @@ void shmem_transport_put_small(shmem_transport_ctx_t* ctx, void *target, const
 
     } while (try_again(ctx, ret, &polled));
     SHMEM_TRANSPORT_OFI_CTX_UNLOCK(ctx);
+#ifdef ENABLE_AGGRESSIVE_PROGRESS
+    shmem_transport_probe();
+#endif
 }
 
 static inline
@@ -591,6 +594,9 @@ void shmem_transport_ofi_put_large(shmem_transport_ctx_t* ctx, void *target, con
         frag_target += frag_len;
     }
     SHMEM_TRANSPORT_OFI_CTX_UNLOCK(ctx);
+#ifdef ENABLE_AGGRESSIVE_PROGRESS
+    shmem_transport_probe();
+#endif
 }
 
 static inline
@@ -625,6 +631,9 @@ void shmem_transport_put_nb(shmem_transport_ctx_t* ctx, void *target, const void
                            key, buff);
         } while (try_again(ctx, ret, &polled));
         SHMEM_TRANSPORT_OFI_CTX_UNLOCK(ctx);
+#ifdef ENABLE_AGGRESSIVE_PROGRESS
+    shmem_transport_probe();
+#endif
 
     } else {
         shmem_transport_ofi_put_large(ctx, target, source,len, pe);
@@ -709,6 +718,9 @@ void shmem_transport_get(shmem_transport_ctx_t* ctx, void *target, const void *s
         }
     }
     SHMEM_TRANSPORT_OFI_CTX_UNLOCK(ctx);
+#ifdef ENABLE_AGGRESSIVE_PROGRESS
+    shmem_transport_probe();
+#endif
 }
 
 
@@ -727,6 +739,7 @@ void shmem_transport_get_wait(shmem_transport_ctx_t* ctx)
     long poll_count = 0;
 
     SHMEM_TRANSPORT_OFI_CTX_LOCK(ctx);
+
 
     while (poll_count < shmem_transport_ofi_get_poll_limit ||
            shmem_transport_ofi_get_poll_limit < 0) {
@@ -755,7 +768,12 @@ void shmem_transport_get_wait(shmem_transport_ctx_t* ctx)
     } while (cnt < cnt_new);
     shmem_internal_assert(cnt == cnt_new);
 
+
     SHMEM_TRANSPORT_OFI_CTX_UNLOCK(ctx);
+#ifdef ENABLE_AGGRESSIVE_PROGRESS
+    shmem_transport_probe();
+#endif
+
 }
 
 
@@ -777,6 +795,7 @@ void shmem_transport_swap(shmem_transport_ctx_t* ctx, void *target, const void *
     SHMEM_TRANSPORT_OFI_CTX_LOCK(ctx);
     SHMEM_TRANSPORT_OFI_CNTR_INC(&ctx->pending_get_cntr);
 
+
     do {
         ret = fi_fetch_atomic(ctx->cntr_ep,
                               source,
@@ -792,6 +811,9 @@ void shmem_transport_swap(shmem_transport_ctx_t* ctx, void *target, const void *
                               NULL);
     } while (try_again(ctx, ret, &polled));
     SHMEM_TRANSPORT_OFI_CTX_UNLOCK(ctx);
+#ifdef ENABLE_AGGRESSIVE_PROGRESS
+    shmem_transport_probe();
+#endif
 
 }
 
@@ -814,6 +836,7 @@ void shmem_transport_cswap(shmem_transport_ctx_t* ctx, void *target, const void 
     SHMEM_TRANSPORT_OFI_CTX_LOCK(ctx);
     SHMEM_TRANSPORT_OFI_CNTR_INC(&ctx->pending_get_cntr);
 
+
     do {
         ret = fi_compare_atomic(ctx->cntr_ep,
                                 source,
@@ -831,6 +854,9 @@ void shmem_transport_cswap(shmem_transport_ctx_t* ctx, void *target, const void 
                                 NULL);
     } while (try_again(ctx, ret, &polled));
     SHMEM_TRANSPORT_OFI_CTX_UNLOCK(ctx);
+#ifdef ENABLE_AGGRESSIVE_PROGRESS
+    shmem_transport_probe();
+#endif
 }
 
 
@@ -852,6 +878,7 @@ void shmem_transport_mswap(shmem_transport_ctx_t* ctx, void *target, const void 
     SHMEM_TRANSPORT_OFI_CTX_LOCK(ctx);
     SHMEM_TRANSPORT_OFI_CNTR_INC(&ctx->pending_get_cntr);
 
+
     do {
         ret = fi_compare_atomic(ctx->cntr_ep,
                                 source,
@@ -869,6 +896,9 @@ void shmem_transport_mswap(shmem_transport_ctx_t* ctx, void *target, const void 
                                 NULL);
     } while (try_again(ctx, ret, &polled));
     SHMEM_TRANSPORT_OFI_CTX_UNLOCK(ctx);
+#ifdef ENABLE_AGGRESSIVE_PROGRESS
+    shmem_transport_probe();
+#endif
 }
 
 
@@ -889,6 +919,7 @@ void shmem_transport_atomic_small(shmem_transport_ctx_t* ctx, void *target, cons
     SHMEM_TRANSPORT_OFI_CTX_LOCK(ctx);
     SHMEM_TRANSPORT_OFI_CNTR_INC(&ctx->pending_put_cntr);
 
+
     do {
         ret = fi_inject_atomic(ctx->cntr_ep,
                                source,
@@ -900,6 +931,9 @@ void shmem_transport_atomic_small(shmem_transport_ctx_t* ctx, void *target, cons
                                op);
     } while (try_again(ctx, ret, &polled));
     SHMEM_TRANSPORT_OFI_CTX_UNLOCK(ctx);
+#ifdef ENABLE_AGGRESSIVE_PROGRESS
+    shmem_transport_probe();
+#endif
 }
 
 
@@ -930,6 +964,9 @@ void shmem_transport_atomic_set(shmem_transport_ctx_t* ctx, void *target, const 
                                FI_ATOMIC_WRITE);
     } while (try_again(ctx, ret, &polled));
     SHMEM_TRANSPORT_OFI_CTX_UNLOCK(ctx);
+#ifdef ENABLE_AGGRESSIVE_PROGRESS
+    shmem_transport_probe();
+#endif
 }
 
 
@@ -950,6 +987,7 @@ void shmem_transport_atomic_fetch(shmem_transport_ctx_t* ctx, void *target, cons
     SHMEM_TRANSPORT_OFI_CTX_LOCK(ctx);
     SHMEM_TRANSPORT_OFI_CNTR_INC(&ctx->pending_get_cntr);
 
+
     do {
         ret = fi_fetch_atomic(ctx->cntr_ep,
                               NULL,
@@ -965,6 +1003,9 @@ void shmem_transport_atomic_fetch(shmem_transport_ctx_t* ctx, void *target, cons
                               NULL);
     } while (try_again(ctx, ret, &polled));
     SHMEM_TRANSPORT_OFI_CTX_UNLOCK(ctx);
+#ifdef ENABLE_AGGRESSIVE_PROGRESS
+    shmem_transport_probe();
+#endif
 }
 
 
@@ -1064,6 +1105,9 @@ void shmem_transport_atomic_nb(shmem_transport_ctx_t* ctx, void *target, const v
         }
     }
     SHMEM_TRANSPORT_OFI_CTX_UNLOCK(ctx);
+#ifdef ENABLE_AGGRESSIVE_PROGRESS
+    shmem_transport_probe();
+#endif
 }
 
 
@@ -1100,6 +1144,9 @@ void shmem_transport_fetch_atomic(shmem_transport_ctx_t* ctx, void *target, cons
                               NULL);
     } while (try_again(ctx, ret, &polled));
     SHMEM_TRANSPORT_OFI_CTX_UNLOCK(ctx);
+#ifdef ENABLE_AGGRESSIVE_PROGRESS
+    shmem_transport_probe();
+#endif
 }
 
 
