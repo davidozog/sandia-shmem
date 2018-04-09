@@ -78,7 +78,7 @@ AC_ARG_ENABLE([manual-progress],
                     [Enable intermittent progress calls inside transport layer (default:disabled)])])
 AS_IF([test "$enable_manual_progress" = "yes"], [AC_DEFINE([ENABLE_MANUAL_PROGRESS], [1], [Enable manual progress])])
 
-AC_ARG_ENABLE([agressive-progress],
+AC_ARG_ENABLE([aggressive-progress],
     [AC_HELP_STRING([--enable-aggressive-progress],
                     [Enable progress calls inside transport layer to all RMA and AMO routines (default:disabled)])])
 AS_IF([test "$enable_aggressive_progress" = "yes"], [AC_DEFINE([ENABLE_AGGRESSIVE_PROGRESS], [1], [Enable aggressive progress])])
