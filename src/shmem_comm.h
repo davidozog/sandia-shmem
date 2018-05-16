@@ -242,6 +242,16 @@ shmem_internal_atomic_small(shmem_ctx_t ctx, void *target, const void *source, s
 
 static inline
 void
+shmem_internal_triggered_atomic_small(shmem_ctx_t ctx, void *target, void *source, size_t len,
+                                      int pe, shm_internal_op_t op, shm_internal_datatype_t datatype,
+                                      shmemx_ct_t ct, long threshold)
+{
+    shmem_transport_triggered_atomic_msg((shmem_transport_ctx_t *)ctx, target, source, len, pe, op, datatype, (shmem_transport_ct_t *) ct, threshold);
+}
+
+
+static inline
+void
 shmem_internal_atomic_fetch(shmem_ctx_t ctx, void *target, const void *source, size_t len,
                             int pe, shm_internal_datatype_t datatype)
 {

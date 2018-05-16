@@ -21,6 +21,9 @@
 #include "shmem_internal.h"
 #include "shmem_collectives.h"
 #include "shmem_internal_op.h"
+#include <sys/types.h>
+#include <unistd.h>
+#include <stdlib.h>
 
 coll_type_t shmem_internal_barrier_type = AUTO;
 coll_type_t shmem_internal_bcast_type = AUTO;
@@ -41,6 +44,7 @@ static int *full_tree_children;
 static int full_tree_num_children;
 static int full_tree_parent;
 static long tree_radix = -1;
+static long nbarriers = 0;
 
 
 static int
@@ -176,6 +180,8 @@ shmem_internal_collectives_init(void)
             shmem_internal_barrier_type = TREE;
         } else if (0 == strcmp(type, "dissem")) {
             shmem_internal_barrier_type = DISSEM;
+        } else if (0 == strcmp(type, "trigger")) {
+            shmem_internal_barrier_type = TRIGGER;
         } else {
             RAISE_WARN_MSG("Ignoring bad barrier algorithm '%s'\n", type);
         }
@@ -410,6 +416,89 @@ shmem_internal_sync_dissem(int PE_start, int logPE_stride, int PE_size, long *pS
 
     /* Ensure local pSync decrements are done before a subsequent barrier */
     shmem_internal_quiet(SHMEM_CTX_DEFAULT);
+}
+
+
+void
+shmem_internal_sync_trigger_tree(int PE_start, int logPE_stride, int PE_size, long *pSync)
+{
+    long one = 1;
+    int stride = 1 << logPE_stride;
+    int parent, num_children, *children;
+    int ret;
+
+    nbarriers++;
+    shmem_internal_quiet(SHMEM_CTX_DEFAULT);
+
+    if (PE_size == shmem_internal_num_pes) {
+        /* we're the full tree, use the binomial tree */
+        parent = full_tree_parent;
+        num_children = full_tree_num_children;
+        children = full_tree_children;
+    } else {
+        children = alloca(sizeof(int) * tree_radix);
+        shmem_internal_build_kary_tree(tree_radix, PE_start, stride, PE_size,
+                                       0, &parent, &num_children, children);
+    }
+
+    if (num_children != 0) {
+        /* Not a pure leaf node */
+        int i;
+
+        if (parent == shmem_internal_my_pe) {
+            /* The root of the tree */
+
+            /* Setup triggered acks down to children */
+            for (i = 0 ; i < num_children ; ++i) {
+                shmem_internal_triggered_atomic_small(SHMEM_CTX_DEFAULT, pSync,
+                                                      &one, sizeof(one),
+                                                      children[i],
+                                                      SHM_INTERNAL_SUM,
+                                                      SHM_INTERNAL_LONG,
+                                                      NULL,
+                                                      num_children*nbarriers);
+            }
+            //shmem_internal_ct_wait(ct, num_children*nbarriers);
+            ret = fi_cntr_wait(shmem_transport_ofi_triggered_cntr, num_children*nbarriers, -1);
+
+        } else {
+            /* Middle of the tree */
+
+            /* Setup triggered ack to parent */
+            shmem_internal_triggered_atomic_small(SHMEM_CTX_DEFAULT, pSync,
+                                                  &one, sizeof(one),
+                                                  parent,
+                                                  SHM_INTERNAL_SUM,
+                                                  SHM_INTERNAL_LONG,
+                                                  NULL,
+                                                  num_children*nbarriers);
+
+            /* Setup triggered acks down to children */
+            for (i = 0 ; i < num_children ; ++i) {
+                shmem_internal_triggered_atomic_small(SHMEM_CTX_DEFAULT, pSync,
+                                            &one, sizeof(one),
+                                            children[i],
+                                            SHM_INTERNAL_SUM,
+                                            SHM_INTERNAL_LONG,
+                                            NULL, (num_children+1)*nbarriers);
+            }
+            //shmem_internal_ct_wait(ct, (num_children+1)*nbarriers);
+            ret = fi_cntr_wait(shmem_transport_ofi_triggered_cntr, (num_children+1)*nbarriers, -1);
+
+        }
+
+    } else {
+        /* Leaf node */
+
+        /* Send message up the tree immediately (trigger at zero) */
+        shmem_internal_triggered_atomic_small(SHMEM_CTX_DEFAULT, pSync,
+                                              &one, sizeof(one), parent,
+                                              SHM_INTERNAL_SUM, SHM_INTERNAL_LONG,
+                                              NULL, 0);
+        //shmem_internal_ct_wait(ct, nbarriers);
+        ret = fi_cntr_wait(shmem_transport_ofi_triggered_cntr, nbarriers, -1);
+    }
+
 }
 
 

@@ -22,6 +22,7 @@
 #include <rdma/fi_rma.h>
 #include <rdma/fi_cm.h>
 #include <rdma/fi_atomic.h>
+#include <rdma/fi_trigger.h>
 #include <string.h>
 #include <unistd.h>
 #include <stddef.h>
@@ -30,6 +31,7 @@
 #include "shmem_internal.h"
 #include "shmem_atomic.h"
 #include <sys/types.h>
+#include <sys/uio.h>
 
 
 #if !defined(ENABLE_HARD_POLLING) || defined(ENABLE_MANUAL_PROGRESS)
@@ -41,6 +43,8 @@
 #if ENABLE_TARGET_CNTR
 extern struct fid_cntr*                 shmem_transport_ofi_target_cntrfd;
 #endif
+extern struct fid_cntr*                 shmem_transport_ofi_triggered_cntr;
+extern struct fi_triggered_context      shmem_transport_ofi_triggered_ctx;
 #ifndef ENABLE_MR_SCALABLE
 extern uint64_t*                        shmem_transport_ofi_target_heap_keys;
 extern uint64_t*                        shmem_transport_ofi_target_data_keys;
@@ -600,6 +604,53 @@ void shmem_transport_ofi_put_large(shmem_transport_ctx_t* ctx, void *target, con
 }
 
 static inline
+void shmem_transport_put_msg(shmem_transport_ctx_t* ctx, void *target, void *source, size_t len,
+                             int pe, uint64_t flags, long threshold)
+{
+    int ret = 0;
+    uint64_t dst = (uint64_t) pe;
+    uint64_t polled = 0;
+    uint64_t key;
+    uint8_t *addr;
+
+    struct fi_msg_rma msg;
+    struct fi_rma_iov rma_iov;
+    struct iovec iov;
+
+    shmem_transport_ofi_get_mr(target, pe, &addr, &key);
+
+    iov.iov_base = source;
+    iov.iov_len = len;
+
+    msg.msg_iov = &iov;
+    msg.desc = NULL;
+    msg.iov_count = 1;
+    msg.addr = GET_DEST(dst);
+
+    rma_iov.addr = GET_DEST(dst);
+    rma_iov.len = len;
+    rma_iov.key = key;
+    msg.rma_iov = &rma_iov;
+    msg.rma_iov_count = 1;
+
+    shmem_transport_ofi_triggered_ctx.event_type = FI_TRIGGER_THRESHOLD;
+    shmem_transport_ofi_triggered_ctx.trigger.threshold.cntr = shmem_transport_ofi_triggered_cntr;
+    shmem_transport_ofi_triggered_ctx.trigger.threshold.threshold = threshold;
+    msg.context = &shmem_transport_ofi_triggered_ctx;
+
+    SHMEM_TRANSPORT_OFI_CTX_LOCK(ctx);
+
+    polled = 0;
+
+    do {
+        ret = fi_writemsg(ctx->cntr_ep, &msg, flags);
+    } while (try_again(ctx, ret, &polled));
+
+
+    SHMEM_TRANSPORT_OFI_CTX_UNLOCK(ctx);
+}
+
+static inline
 void shmem_transport_put_nb(shmem_transport_ctx_t* ctx, void *target, const void *source, size_t len,
                             int pe, long *completion)
 {
@@ -905,6 +956,58 @@ void shmem_transport_atomic_small(shmem_transport_ctx_t* ctx, void *target, cons
                                datatype,
                                op);
     } while (try_again(ctx, ret, &polled));
+    SHMEM_TRANSPORT_OFI_CTX_UNLOCK(ctx);
+}
+
+
+static inline
+void shmem_transport_triggered_atomic_msg(shmem_transport_ctx_t* ctx, void* target, void *source,
+                                          size_t len, int pe, int op, int datatype,
+                                          shmem_transport_ct_t *ct, long threshold)
+{
+    int ret = 0;
+    uint64_t dst = (uint64_t) pe;
+    uint64_t polled = 0;
+    uint64_t key;
+    uint8_t *addr;
+
+    struct fi_msg_atomic msg;
+    struct fi_rma_ioc rma_iov;
+    struct fi_ioc iov;
+
+    shmem_transport_ofi_get_mr(target, pe, &addr, &key);
+
+    shmem_internal_assert(SHMEM_Dtsize[datatype] == len);
+
+    iov.addr = source;
+    iov.count = 1;
+
+    msg.msg_iov = &iov;
+    msg.desc = NULL;
+    msg.iov_count = 1;
+    msg.addr = GET_DEST(dst);
+
+    rma_iov.addr = GET_DEST(dst);
+    rma_iov.count = 1;
+    rma_iov.key = key;
+    msg.rma_iov = &rma_iov;
+    msg.rma_iov_count = 1;
+
+    shmem_transport_ofi_triggered_ctx.event_type = FI_TRIGGER_THRESHOLD;
+    shmem_transport_ofi_triggered_ctx.trigger.threshold.cntr = shmem_transport_ofi_triggered_cntr;
+    shmem_transport_ofi_triggered_ctx.trigger.threshold.threshold = threshold;
+    msg.context = &shmem_transport_ofi_triggered_ctx;
+
+    SHMEM_TRANSPORT_OFI_CTX_LOCK(ctx);
+    SHMEM_TRANSPORT_OFI_CNTR_INC(&ctx->pending_put_cntr);
+
+    polled = 0;
+
+    do {
+        ret = fi_atomicmsg(ctx->cntr_ep, &msg, FI_TRIGGER);
+    } while (try_again(ctx, ret, &polled));
+
+
     SHMEM_TRANSPORT_OFI_CTX_UNLOCK(ctx);
 }
 

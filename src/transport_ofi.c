@@ -61,6 +61,8 @@ struct fid_ep*                  shmem_transport_ofi_target_ep;
 #if ENABLE_TARGET_CNTR
 struct fid_cntr*                shmem_transport_ofi_target_cntrfd;
 #endif
+struct fid_cntr*                shmem_transport_ofi_triggered_cntr;
+struct fi_triggered_context     shmem_transport_ofi_triggered_ctx;
 #ifdef ENABLE_MR_SCALABLE
 #ifdef ENABLE_REMOTE_VIRTUAL_ADDRESSING
 struct fid_mr*                  shmem_transport_ofi_target_mrfd;
@@ -1289,6 +1291,21 @@ static int shmem_transport_ofi_target_ep_init(void)
     return 0;
 }
 
+static int shmem_transport_setup_triggers(void)
+{
+    struct fi_cntr_attr cntr_trigger_attr = {.events = FI_CNTR_EVENTS_COMP,};
+
+    int ret = fi_cntr_open(shmem_transport_ofi_domainfd, &cntr_trigger_attr,
+                           &shmem_transport_ofi_triggered_cntr,
+                           &shmem_transport_ofi_triggered_ctx);
+    OFI_CHECK_RETURN_STR(ret, "fi_cntr_open on triggered counter failed");
+
+    ret = fi_ep_bind(shmem_transport_ctx_default.cntr_ep, &shmem_transport_ofi_triggered_cntr->fid, FI_SEND | FI_TRANSMIT);
+
+    return 0;
+
+}
+
 static int shmem_transport_ofi_ctx_init(shmem_transport_ctx_t *ctx, int id)
 {
     int ret = 0;
@@ -1506,6 +1523,9 @@ int shmem_transport_startup(void)
 
     ret = populate_av();
     if (ret != 0) return ret;
+
+    ret = shmem_transport_setup_triggers();
+    if (ret !=0 ) return ret;
 
     return 0;
 }

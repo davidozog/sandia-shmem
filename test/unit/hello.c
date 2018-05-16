@@ -33,6 +33,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <sys/types.h>
+#include <unistd.h>
+#include <stdlib.h>
+
 int
 main(int argc, char* argv[], char *envp[])
 {
@@ -41,6 +45,25 @@ main(int argc, char* argv[], char *envp[])
     ** Starts/Initializes SHMEM/OpenSHMEM
     */
     shmem_init();
+//{
+//  int i = 0;
+//  char hostname[256];
+//  gethostname(hostname, sizeof(hostname));
+//  system("rm gdb.[0-9]*");
+//
+//  shmem_barrier_all();
+//
+//  char filename[64];
+//  sprintf(filename, "gdb.%d", getpid());
+//  FILE *fp = fopen(filename, "w");
+//  fprintf( fp, "%d", getpid() );
+//  fclose(fp);
+//  printf("PID %d on %s ready for attach\n", getpid(), hostname);
+//
+//  fflush(stdout);
+//  while (0 == i)
+//      sleep(1);
+//}
     /*
     ** Fetch the number or processes
     ** Some implementations use num_pes();
