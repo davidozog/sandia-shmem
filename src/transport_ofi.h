@@ -44,6 +44,9 @@
 extern struct fid_cntr*                 shmem_transport_ofi_target_cntrfd;
 #endif
 extern struct fid_cntr*                 shmem_transport_ofi_triggered_cntr;
+extern struct fid_cntr*                 shmem_transport_ofi_triggered_snd_cntr;
+extern struct fid_cntr*                 shmem_transport_ofi_triggered_rcv_cntr;
+extern struct fid_cntr*                 shmem_transport_ofi_triggered_first_cntr;
 extern struct fi_triggered_context      shmem_transport_ofi_triggered_ctx;
 #ifndef ENABLE_MR_SCALABLE
 extern uint64_t*                        shmem_transport_ofi_target_heap_keys;
@@ -1315,5 +1318,7 @@ void shmem_transport_syncmem(void)
     // TODO: libfabric does not yet have an analog to PtlAtomicSync() in Portals4, so the OFI 
     // transport routine will be a nop until an API is provided.
 }
+
+int shmem_transport_setup_triggers(int, int, int *);
 
 #endif /* TRANSPORT_OFI_H */

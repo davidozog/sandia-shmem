@@ -30,11 +30,19 @@
 #include <inttypes.h>
 #include <netdb.h>
 
+#include <sys/types.h>
+#include <unistd.h>
+#include <stdlib.h>
+
 #if HAVE_FNMATCH_H
 #include <fnmatch.h>
 #else
 #define fnmatch(P, S, F) strcmp(P, S)
 #endif
+
+#define SEND 1
+#define RECV 2
+#define RTR_TAG   7654
 
 #define SHMEM_INTERNAL_INCLUDE
 #include "shmem.h"
@@ -62,6 +70,9 @@ struct fid_ep*                  shmem_transport_ofi_target_ep;
 struct fid_cntr*                shmem_transport_ofi_target_cntrfd;
 #endif
 struct fid_cntr*                shmem_transport_ofi_triggered_cntr;
+struct fid_cntr*                shmem_transport_ofi_triggered_snd_cntr;
+struct fid_cntr*                shmem_transport_ofi_triggered_rcv_cntr;
+struct fid_cntr*                shmem_transport_ofi_triggered_first_cntr;
 struct fi_triggered_context     shmem_transport_ofi_triggered_ctx;
 #ifdef ENABLE_MR_SCALABLE
 #ifdef ENABLE_REMOTE_VIRTUAL_ADDRESSING
@@ -1251,13 +1262,15 @@ int query_for_fabric(struct fabric_info *info)
 
     shmem_internal_assertp(info->p_info->tx_attr->inject_size >= shmem_transport_ofi_max_buffered_send);
     shmem_transport_ofi_max_buffered_send = info->p_info->tx_attr->inject_size;
+
 #ifdef ENABLE_MR_RMA_EVENT
     shmem_transport_ofi_mr_rma_event = (info->p_info->domain_attr->mr_mode & FI_MR_RMA_EVENT) != 0;
 #endif
 
-    DEBUG_MSG("OFI provider: %s, fabric: %s, domain: %s\n",
+    DEBUG_MSG("OFI provider: %s, fabric: %s, domain: %s, inject: %zu\n",
               info->p_info->fabric_attr->prov_name,
-              info->p_info->fabric_attr->name, info->p_info->domain_attr->name);
+              info->p_info->fabric_attr->name, info->p_info->domain_attr->name,
+              shmem_transport_ofi_max_buffered_send);
 
     return ret;
 }
@@ -1268,7 +1281,7 @@ static int shmem_transport_ofi_target_ep_init(void)
 
     struct fabric_info* info = &shmem_transport_ofi_info;
     info->p_info->ep_attr->tx_ctx_cnt = 0;
-    info->p_info->caps = FI_RMA | FI_ATOMICS | FI_REMOTE_READ | FI_REMOTE_WRITE;
+    info->p_info->caps = FI_RMA | FI_ATOMICS | FI_REMOTE_READ | FI_REMOTE_WRITE | FI_TAGGED | FI_TRIGGER;
     info->p_info->tx_attr->op_flags = FI_DELIVERY_COMPLETE;
     info->p_info->mode = 0;
     info->p_info->tx_attr->mode = 0;
@@ -1291,16 +1304,173 @@ static int shmem_transport_ofi_target_ep_init(void)
     return 0;
 }
 
-static int shmem_transport_setup_triggers(void)
+static int prepare_cmd(struct fid_domain *domain, struct fid_ep *ep, struct fi_deferred_work *work, 
+                       fi_addr_t addr, int cmd_type, void *buf, int size, int tag, int thresh, 
+                       struct fid_cntr *trigger_cntr, struct fid_cntr *complete_cntr)
 {
+    struct iovec iov;
+    struct fi_msg_tagged *msg;
+    int ret;
+
+    work->threshold = thresh;
+    work->triggering_cntr = trigger_cntr;
+    work->completion_cntr = complete_cntr;
+
+    work->op.tagged = (struct fi_op_tagged *) malloc(sizeof(struct fi_op_tagged));
+    memset(work->op.tagged, 0, sizeof(struct fi_op_tagged));
+    msg = &work->op.tagged->msg;
+    if (size > 0 || 1) {
+    iov.iov_base = buf;
+    iov.iov_len  = size; // BUF_SIZE*sizeof(double);
+    msg->msg_iov   = &iov;
+    msg->iov_count = 1;
+    }
+    else {
+    msg->msg_iov   = NULL;
+    msg->iov_count = 0;
+    }
+    msg->desc = 0; //fi_mr_desc(cmd_type == SEND?s_mr:r_mr);
+    msg->addr = addr;
+    msg->data = 0;
+    msg->tag = tag;
+    msg->ignore = 0;
+
+    work->op.tagged->ep = ep;
+    work->op.tagged->flags = 0;
+    work->op.tagged->msg.context = &work->context;
+    work->op_type = cmd_type == SEND?FI_OP_TSEND:FI_OP_TRECV;
+
+    ret = fi_control(&domain->fid, FI_QUEUE_WORK, work);
+    if (ret) {
+        fprintf(stderr, "fi_control (%s)\n", fi_strerror(ret));
+        return ret;
+    }
+
+    return 0;
+}
+
+
+int shmem_transport_setup_triggers(int parent, int num_children, int *children)
+{
+    int i = 0, j = 0, k = 0, index = 0;
+    int ret = 0;
+    long tree_radix = -1;
+    char *buffer = NULL;
+    size_t buf_sz = 8;
+    int root, leaf, first_child; //intermediate = 0, leaf = 0, kth_child, parent = -1;
+    int threshold;
+    struct fi_deferred_work *works;
     struct fi_cntr_attr cntr_trigger_attr = {.events = FI_CNTR_EVENTS_COMP,};
 
-    int ret = fi_cntr_open(shmem_transport_ofi_domainfd, &cntr_trigger_attr,
-                           &shmem_transport_ofi_triggered_cntr,
-                           &shmem_transport_ofi_triggered_ctx);
-    OFI_CHECK_RETURN_STR(ret, "fi_cntr_open on triggered counter failed");
+    buffer = malloc(buf_sz);
+    char seed = 0;
+    for (i = 0; i < 8; i++) {
+        buffer[i] = seed++;
+    }
+    i = 0;
 
-    ret = fi_ep_bind(shmem_transport_ctx_default.cntr_ep, &shmem_transport_ofi_triggered_cntr->fid, FI_SEND | FI_TRANSMIT);
+    ret = fi_cntr_open(shmem_transport_ofi_domainfd, &cntr_trigger_attr,
+                       &shmem_transport_ofi_triggered_snd_cntr,
+                       &shmem_transport_ofi_triggered_ctx);
+    OFI_CHECK_RETURN_STR(ret, "fi_cntr_open on triggered send counter failed");
+
+    ret = fi_cntr_open(shmem_transport_ofi_domainfd, &cntr_trigger_attr,
+                       &shmem_transport_ofi_triggered_rcv_cntr,
+                       &shmem_transport_ofi_triggered_ctx);
+    OFI_CHECK_RETURN_STR(ret, "fi_cntr_open on triggered receive counter failed");
+
+    ret = fi_cntr_open(shmem_transport_ofi_domainfd, &cntr_trigger_attr,
+                       &shmem_transport_ofi_triggered_first_cntr,
+                       &shmem_transport_ofi_triggered_ctx);
+    OFI_CHECK_RETURN_STR(ret, "fi_cntr_open on triggered threshold counter failed");
+
+    tree_radix = shmem_internal_params.COLL_RADIX;
+    works = (struct fi_deferred_work *)malloc((2*tree_radix + 2)*sizeof(struct fi_deferred_work));
+
+    root = (parent == shmem_internal_my_pe); 
+    first_child = children[0];
+    leaf = (root ? 0 : (num_children == 0));
+
+{
+  int i = 0;
+  char hostname[256];
+  gethostname(hostname, sizeof(hostname));
+  system("rm gdb.[0-9]*");
+
+  shmem_barrier_all();
+
+  char filename[64];
+  sprintf(filename, "gdb.%d", getpid());
+  FILE *fp = fopen(filename, "w");
+  fprintf( fp, "%d", getpid() );
+  fclose(fp);
+  printf("PID %d on %s ready for attach\n", getpid(), hostname);
+
+  fflush(stdout);
+  while (0 == i)
+      sleep(1);
+}
+
+i = 0;
+
+    //pre-posting the recvs for RTR
+    if(!leaf) {
+        for(j=0; j<num_children; j++) {
+            ret = prepare_cmd(shmem_transport_ofi_domainfd, shmem_transport_ofi_target_ep, 
+                              &works[i + j], GET_DEST(first_child + j), RECV, NULL, 0, RTR_TAG, 0,
+                              shmem_transport_ofi_triggered_first_cntr, shmem_transport_ofi_triggered_rcv_cntr);
+        }
+    }
+    i = i + j;
+    
+    //pre-posting the recvs for data
+    if (!root) {
+        ret = prepare_cmd(shmem_transport_ofi_domainfd, shmem_transport_ofi_target_ep,
+                          &works[i++], GET_DEST(parent), RECV, buffer, buf_sz, buf_sz, 0,
+                          shmem_transport_ofi_triggered_first_cntr, shmem_transport_ofi_triggered_rcv_cntr);
+    }
+    index = i;
+
+    if (root) {
+        sprintf(buffer, "Hello0%d", shmem_internal_my_pe);
+    }
+    
+    //sending RTR
+    if(!root) {
+        ret = fi_tinject(shmem_transport_ofi_target_ep, NULL, 0, GET_DEST(parent), RTR_TAG);
+    }
+
+    if(root) {
+        threshold = num_children;
+    } else {
+        threshold = 1 + num_children;
+    }
+    
+    //triggered sends for data
+    if (!leaf) {
+        for(k = 0; k < num_children; k++) {
+            ret = prepare_cmd(shmem_transport_ofi_domainfd, shmem_transport_ofi_target_ep,
+                              &works[index + k], GET_DEST(first_child + k), SEND, buffer, buf_sz, buf_sz, threshold,
+                              shmem_transport_ofi_triggered_rcv_cntr, shmem_transport_ofi_triggered_snd_cntr);
+        }
+    }
+    index = index + k;
+
+    if (!leaf) {
+        if(root) {
+            ret = fi_cntr_wait(shmem_transport_ofi_triggered_snd_cntr, num_children, -1);
+            ret = fi_cntr_wait(shmem_transport_ofi_triggered_rcv_cntr, num_children, -1);
+        } else {
+            ret = fi_cntr_wait(shmem_transport_ofi_triggered_snd_cntr, num_children, -1);
+            ret = fi_cntr_wait(shmem_transport_ofi_triggered_rcv_cntr, num_children + 1, -1);
+        }
+
+    } else {
+        ret = fi_cntr_wait(shmem_transport_ofi_triggered_rcv_cntr, 1, -1);
+
+    }
+
+    fprintf(stderr, "Myrank = %d, rcv buf = %s\n", shmem_internal_my_pe, buffer);
 
     return 0;
 
@@ -1524,9 +1694,6 @@ int shmem_transport_startup(void)
     ret = populate_av();
     if (ret != 0) return ret;
 
-    ret = shmem_transport_setup_triggers();
-    if (ret !=0 ) return ret;
-
     return 0;
 }
 
@@ -1725,6 +1892,10 @@ int shmem_transport_fini(void)
     ret = fi_close(&shmem_transport_ofi_target_cntrfd->fid);
     OFI_CHECK_ERROR_MSG(ret, "Target CT close failed (%s)\n", fi_strerror(errno));
 #endif
+
+    ret = fi_close(&shmem_transport_ofi_triggered_first_cntr->fid);
+    ret = fi_close(&shmem_transport_ofi_triggered_snd_cntr->fid);
+    ret = fi_close(&shmem_transport_ofi_triggered_rcv_cntr->fid);
 
     ret = fi_close(&shmem_transport_ofi_avfd->fid);
     OFI_CHECK_ERROR_MSG(ret, "AV close failed (%s)\n", fi_strerror(errno));

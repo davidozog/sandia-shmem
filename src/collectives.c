@@ -239,6 +239,12 @@ shmem_internal_collectives_init(void)
         }
     }
 
+    int ret = shmem_transport_setup_triggers(full_tree_parent,
+                                             full_tree_num_children,
+                                             full_tree_children);
+    if (ret !=0 ) return ret;
+
+
     return 0;
 }
 

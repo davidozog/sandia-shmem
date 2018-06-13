@@ -353,6 +353,8 @@ shmem_internal_init(int tl_requested, int *tl_provided)
     }
 #endif
 
+    shmem_internal_initialized = 1;
+
     ret = shmem_internal_collectives_init();
     if (ret != 0) {
         RETURN_ERROR_MSG("Initialization of collectives failed (%d)\n", ret);
@@ -360,7 +362,6 @@ shmem_internal_init(int tl_requested, int *tl_provided)
     }
 
     atexit(shmem_internal_shutdown_atexit);
-    shmem_internal_initialized = 1;
 
     /* get hostname for shmem_getnodename */
     if (gethostname(shmem_internal_my_hostname,
