@@ -45,6 +45,8 @@
 #include "runtime.h"
 #include "uthash.h"
 
+__thread unsigned int shmem_transport_ofi_seed;
+
 struct fabric_info {
     struct fi_info *fabrics;
     struct fi_info *p_info;
@@ -323,7 +325,8 @@ uint64_t shmem_transport_ofi_max_poll = (1ULL<<30);
 
 enum stx_allocator_t {
     ROUNDROBIN = 0,
-    RANDOM
+    RANDOM = 1,
+    LEAST_USED
 };
 typedef enum stx_allocator_t stx_allocator_t;
 static stx_allocator_t shmem_transport_ofi_stx_allocator;
@@ -380,6 +383,7 @@ static int rand_pool_top_idx;
 
 static inline
 void shmem_transport_ofi_stx_rand_init(void) {
+
     rand_pool_indices = malloc(shmem_transport_ofi_stx_max * sizeof(int));
 
     if (rand_pool_indices == NULL)
@@ -400,11 +404,17 @@ void shmem_transport_ofi_stx_rand_restart(void) {
 
 static inline
 int shmem_transport_ofi_stx_rand_next(void) {
+
+    shmem_transport_ofi_seed = (unsigned int)shmem_transport_ofi_gettid().val.uint64_val;;
+
     /* Iterator is empty and should be restarted */
-    if (rand_pool_top_idx < 0) return -1;
+    if (rand_pool_top_idx < 0) {
+        shmem_transport_ofi_stx_rand_restart();
+        return -1;
+    }
 
     /* Choose an STX index from the unselected subset */
-    int choice = rand() % (rand_pool_top_idx + 1);
+    int choice = rand_r(&shmem_transport_ofi_seed) % (rand_pool_top_idx + 1);
 
     /* Swap the value at the chosen index with the value at the top index */
     int tmp = rand_pool_indices[choice];
@@ -412,6 +422,7 @@ int shmem_transport_ofi_stx_rand_next(void) {
     rand_pool_indices[rand_pool_top_idx] = tmp;
 
     rand_pool_top_idx--;
+
     return tmp;
 }
 
@@ -461,7 +472,7 @@ int shmem_transport_ofi_stx_search_shared(long threshold)
             break;
 
         case RANDOM:
-            shmem_transport_ofi_stx_rand_restart();
+            //shmem_transport_ofi_stx_rand_restart();
             while ((i = shmem_transport_ofi_stx_rand_next()) >= 0) {
                 if (shmem_transport_ofi_stx_pool[i].ref_cnt > 0 &&
                     (shmem_transport_ofi_stx_pool[i].ref_cnt <= threshold || threshold == -1) &&
@@ -473,6 +484,24 @@ int shmem_transport_ofi_stx_search_shared(long threshold)
             }
 
             break;
+
+        case LEAST_USED:
+            i = rr_start_idx;
+            int min_ref = INT_MAX;
+            int min_idx = -1;
+            for (i = 0; i < shmem_transport_ofi_stx_max; i++) {
+                if (shmem_transport_ofi_stx_pool[i].ref_cnt < min_ref) {
+                    min_ref = shmem_transport_ofi_stx_pool[i].ref_cnt;
+                    min_idx = i;
+                }
+            }
+
+            printf("min_ref is %d at idx %d\n", min_ref, min_idx);
+            stx_idx = min_idx;
+            rr_start_idx = (min_idx + 1) % shmem_transport_ofi_stx_max;
+
+            break;
+
         default:
             RAISE_ERROR_MSG("Invalid STX allocator (%d)\n",
                             shmem_transport_ofi_stx_allocator);
@@ -1441,6 +1470,8 @@ int shmem_transport_init(void)
     } else if (0 == strcmp(type, "random")) {
         shmem_transport_ofi_stx_allocator = RANDOM;
         shmem_transport_ofi_stx_rand_init();
+    } else if (0 == strcmp(type, "least-used")) {
+        shmem_transport_ofi_stx_allocator = LEAST_USED;
     } else {
         RAISE_WARN_MSG("Ignoring bad STX share algorithm '%s', using 'round-robin'\n", type);
         shmem_transport_ofi_stx_allocator = ROUNDROBIN;
@@ -1723,6 +1754,8 @@ int shmem_transport_fini(void)
             break;
         case RANDOM:
             shmem_transport_ofi_stx_rand_fini();
+            break;
+        case LEAST_USED:
             break;
         default:
             RAISE_ERROR_MSG("Invalid STX allocator (%d)\n",
