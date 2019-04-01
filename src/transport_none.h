@@ -233,6 +233,24 @@ shmem_transport_atomicv(shmem_transport_ctx_t* ctx, void *target, const void *so
 
 static inline
 void
+shmem_transport_triggered_atomic_small(const void *source, size_t len,
+                                       int pe, shm_internal_op_t op, shm_internal_datatype_t datatype,
+                                       shmem_transport_ct_t *ct, long threshold)
+{
+    RAISE_ERROR_STR("No path to peer");
+}
+
+static inline
+void
+shmem_transport_atomic_nb(void *target, const void *source, size_t len,
+                          int pe, shm_internal_op_t op, shm_internal_datatype_t datatype,
+                          long *completion)
+{
+    RAISE_ERROR_STR("No path to peer");
+}
+
+static inline
+void
 shmem_transport_fetch_atomic(shmem_transport_ctx_t* ctx, void *target, const void *source, void *dest, size_t len,
                              int pe, shm_internal_op_t op, shm_internal_datatype_t datatype)
 {
@@ -290,6 +308,12 @@ long shmem_transport_ct_get(shmem_transport_ct_t *ct)
 
 static inline
 void shmem_transport_ct_set(shmem_transport_ct_t *ct, long value)
+{
+    RAISE_ERROR_STR("No path to peer");
+}
+
+static inline
+void shmem_transport_triggered_ct_set(shmem_transport_ct_t *ct, long value, long threshold)
 {
     RAISE_ERROR_STR("No path to peer");
 }

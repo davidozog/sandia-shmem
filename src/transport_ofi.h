@@ -23,6 +23,8 @@
 #include <rdma/fi_rma.h>
 #include <rdma/fi_cm.h>
 #include <rdma/fi_atomic.h>
+#include <rdma/fi_trigger.h>
+#include <netdb.h>
 #include <string.h>
 #include <unistd.h>
 #include <stddef.h>
@@ -32,7 +34,6 @@
 #include "shmem_atomic.h"
 #include <sys/types.h>
 
-
 #if !defined(ENABLE_HARD_POLLING)
 #define ENABLE_TARGET_CNTR 1
 #else
@@ -40,6 +41,11 @@
 #endif
 
 #if ENABLE_TARGET_CNTR
+extern struct fid_domain*               shmem_transport_ofi_domainfd;
+extern struct fid_ep*                   shmem_transport_ofi_epfd;
+extern struct fid_ep*                   shmem_transport_ofi_cntr_epfd;
+extern struct fid_cq*                   shmem_transport_ofi_put_nb_cqfd;
+#ifndef ENABLE_HARD_POLLING
 extern struct fid_cntr*                 shmem_transport_ofi_target_cntrfd;
 #endif
 #if ENABLE_MANUAL_PROGRESS
@@ -242,7 +248,10 @@ struct shmem_transport_ofi_bounce_buffer_t {
 
 typedef struct shmem_transport_ofi_bounce_buffer_t shmem_transport_ofi_bounce_buffer_t;
 
-typedef int shmem_transport_ct_t;
+struct shmem_transport_ct_t {
+    struct fid_cntr ct;
+};
+typedef struct shmem_transport_ct_t shmem_transport_ct_t;
 
 enum shmem_internal_tid_t { tid_is_pid_t, tid_is_uint64_t };
 struct shmem_internal_tid
@@ -1082,6 +1091,72 @@ void shmem_transport_atomic(shmem_transport_ctx_t* ctx, void *target, const void
 
     SHMEM_TRANSPORT_OFI_CTX_LOCK(ctx);
     SHMEM_TRANSPORT_OFI_CNTR_INC(&ctx->pending_put_cntr);
+    do {
+        ret = fi_inject_atomic(shmem_transport_ofi_cntr_epfd,
+                               source,
+                               1,
+                               GET_DEST(dst),
+                               (uint64_t) addr,
+                               key,
+                               datatype,
+                               op);
+    } while(try_again(ret,&polled));
+
+    shmem_transport_ofi_pending_put_counter++;
+}
+
+
+static inline
+void shmem_transport_triggered_atomic_small(const void *source, size_t len,
+                                            int pe, shm_internal_op_t op,
+                                            shm_internal_datatype_t datatype,
+                                            shmem_transport_ct_t *ct, long threshold)
+{
+    int ret = 0;
+    uint64_t dst = (uint64_t) pe;
+    uint64_t polled = 0;
+    uint64_t key;
+    uint8_t *addr;
+
+  struct fi_triggered_context triggered_ctx;
+  triggered_ctx.event_type = FI_TRIGGER_THRESHOLD;
+  triggered_ctx.trigger.threshold.cntr = &(ct->ct);
+  triggered_ctx.trigger.threshold.threshold = threshold;
+
+    shmem_transport_ofi_get_mr(source, pe, &addr, &key);
+
+    shmem_internal_assert(SHMEM_Dtsize[datatype] == len);
+
+    do {
+        ret = fi_atomic(shmem_transport_ofi_cntr_epfd,
+                        source,
+                        1,
+                        NULL,
+                        GET_DEST(dst),
+                        (uint64_t) addr,
+                        key,
+                        datatype,
+                        op,
+                        &triggered_ctx);
+    } while(try_again(ret,&polled));
+
+    shmem_transport_ofi_pending_put_counter++;
+}
+
+
+static inline
+void shmem_transport_atomic_set(void *target, const void *source, size_t len,
+                                int pe, int datatype)
+{
+    int ret = 0;
+    uint64_t dst = (uint64_t) pe;
+    uint64_t polled = 0;
+    uint64_t key;
+    uint8_t *addr;
+
+    shmem_transport_ofi_get_mr(target, pe, &addr, &key);
+
+    shmem_internal_assert(SHMEM_Dtsize[datatype] == len);
 
     do {
         ret = fi_inject_atomic(ctx->ep,
@@ -1369,13 +1444,46 @@ void shmem_transport_get_ct(shmem_transport_ct_t *ct, void *target,
 static inline
 void shmem_transport_ct_create(shmem_transport_ct_t **ct_ptr)
 {
-    RAISE_ERROR_STR("OFI transport does not currently support CT operations");
+    int ret;
+    struct fi_cntr_attr cntr_attr = {0};
+    shmem_transport_ct_t mytct;
+    struct fid_cntr *myct;
+
+    cntr_attr.events   = FI_CNTR_EVENTS_COMP;
+#ifdef ENABLE_COMPLETION_POLLING
+    cntr_attr.wait_obj = FI_WAIT_NONE;
+#else
+    cntr_attr.wait_obj = FI_WAIT_UNSPEC;
+#endif
+
+    ret = fi_cntr_open(shmem_transport_ofi_domainfd, &cntr_attr, &myct, NULL);
+    if (ret!=0) {
+        RAISE_WARN_STR("transport_ct_create cntr_open failed");
+        return;
+    }
+
+    ret = fi_ep_bind(shmem_transport_ofi_cntr_epfd, &myct->fid, FI_WRITE);
+    if (ret!=0) {
+        RAISE_WARN_STR("ep_bind cntr_epfd2trigger_cntr failed");
+        return;
+    }
+
+    mytct.ct = *myct;
+    *ct_ptr = &mytct;
+
+    return;
 }
 
 static inline
 void shmem_transport_ct_free(shmem_transport_ct_t **ct_ptr)
 {
-    RAISE_ERROR_STR("OFI transport does not currently support CT operations");
+
+    shmem_transport_ct_t *ctp = *ct_ptr;
+    if (&(ctp->ct) &&
+        fi_close(&(&(ctp->ct))->fid)) {
+        RAISE_ERROR_MSG("TRIGGERED CT close failed (%s)\n", fi_strerror(errno));
+    }
+    return;
 }
 
 static inline
@@ -1389,6 +1497,12 @@ static inline
 void shmem_transport_ct_set(shmem_transport_ct_t *ct, long value)
 {
     RAISE_ERROR_STR("OFI transport does not currently support CT operations");
+}
+
+static inline
+void shmem_transport_triggered_ct_set(shmem_transport_ct_t *ct, long value, long threshold)
+{
+    RAISE_ERROR_STR("OFI transport does not currently support triggered CT operations");
 }
 
 static inline

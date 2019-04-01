@@ -1099,6 +1099,7 @@ int query_for_fabric(struct fabric_info *info)
                                    ordering semantics to fi_atomicmsg
                                    for put with signal implementation */
 #endif
+    hints.caps |= FI_TRIGGER;   /* enable triggerable endpoints */
     hints.addr_format         = FI_FORMAT_UNSPEC;
     domain_attr.data_progress = FI_PROGRESS_AUTO;
     domain_attr.resource_mgmt = FI_RM_ENABLED;
