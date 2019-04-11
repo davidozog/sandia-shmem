@@ -1,4 +1,5 @@
 /* -*- C -*-
+ * 
  *
  * Copyright 2011 Sandia Corporation. Under the terms of Contract
  * DE-AC04-94AL85000 with Sandia Corporation, the U.S.  Government
@@ -417,6 +418,7 @@ void shmem_internal_global_exit(int status) SHMEM_ATTRIBUTE_NORETURN;
 int shmem_internal_symmetric_init(void);
 int shmem_internal_symmetric_fini(void);
 int shmem_internal_collectives_init(void);
+int shmem_internal_collectives_fini(void);
 
 /* internal allocation, without a barrier */
 void *shmem_internal_shmalloc(size_t size);

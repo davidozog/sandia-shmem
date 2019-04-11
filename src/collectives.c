@@ -245,12 +245,13 @@ shmem_internal_collectives_init(void)
     return 0;
 }
 
-void
-shmem_internal_collectives_fini()
+int
+shmem_internal_collectives_fini(void)
 {
     if (shmem_internal_barrier_type == TRIGGER) {
         shmem_internal_ct_free(&ct);
     }
+    return 0;
 }
 
 
@@ -426,14 +427,14 @@ shmem_internal_sync_dissem(int PE_start, int logPE_stride, int PE_size, long *pS
 }
 
 void
-shmem_internal_barrier_trigger_tree(int PE_start, int logPE_stride, int PE_size, long *pSync)
+shmem_internal_sync_trigger_tree(int PE_start, int logPE_stride, int PE_size, long *pSync)
 {
     long one = 1;
     int stride = 1 << logPE_stride;
     int parent, num_children, *children;
 
     nbarriers++;
-    shmem_internal_quiet();
+    shmem_internal_quiet(SHMEM_CTX_DEFAULT);
 
     if (PE_size == shmem_internal_num_pes) {
         /* we're the full tree, use the binomial tree */
@@ -455,7 +456,8 @@ shmem_internal_barrier_trigger_tree(int PE_start, int logPE_stride, int PE_size,
 
             /* Setup triggered acks down to children */
             for (i = 0 ; i < num_children ; ++i) {
-                shmem_internal_triggered_atomic_small(&one, sizeof(one),
+                shmem_internal_triggered_atomic_small(SHMEM_CTX_DEFAULT,
+                                                      &one, sizeof(one),
                                                       children[i],
                                                       SHM_INTERNAL_SUM,
                                                       SHM_INTERNAL_LONG,
@@ -468,7 +470,8 @@ shmem_internal_barrier_trigger_tree(int PE_start, int logPE_stride, int PE_size,
             /* Middle of the tree */
 
             /* Setup triggered ack to parent */
-            shmem_internal_triggered_atomic_small(&one, sizeof(one),
+            shmem_internal_triggered_atomic_small(SHMEM_CTX_DEFAULT,
+                                                  &one, sizeof(one),
                                                   parent,
                                                   SHM_INTERNAL_SUM,
                                                   SHM_INTERNAL_LONG,
@@ -477,7 +480,8 @@ shmem_internal_barrier_trigger_tree(int PE_start, int logPE_stride, int PE_size,
 
             /* Setup triggered acks down to children */
             for (i = 0 ; i < num_children ; ++i) {
-                shmem_internal_triggered_atomic_small(&one, sizeof(one),
+                shmem_internal_triggered_atomic_small(SHMEM_CTX_DEFAULT,
+                                            &one, sizeof(one),
                                             children[i],
                                             SHM_INTERNAL_SUM,
                                             SHM_INTERNAL_LONG,
@@ -491,7 +495,8 @@ shmem_internal_barrier_trigger_tree(int PE_start, int logPE_stride, int PE_size,
         /* Leaf node */
 
         /* Send message up the tree immediately (trigger at zero) */
-        shmem_internal_triggered_atomic_small(&one, sizeof(one), parent,
+        shmem_internal_triggered_atomic_small(SHMEM_CTX_DEFAULT,
+                                              &one, sizeof(one), parent,
                                               SHM_INTERNAL_SUM, SHM_INTERNAL_LONG,
                                               ct, 0);
         shmem_internal_ct_wait(ct, nbarriers);

@@ -40,12 +40,10 @@
 #define ENABLE_TARGET_CNTR 0
 #endif
 
-#if ENABLE_TARGET_CNTR
 extern struct fid_domain*               shmem_transport_ofi_domainfd;
 extern struct fid_ep*                   shmem_transport_ofi_epfd;
-extern struct fid_ep*                   shmem_transport_ofi_cntr_epfd;
 extern struct fid_cq*                   shmem_transport_ofi_put_nb_cqfd;
-#ifndef ENABLE_HARD_POLLING
+#if ENABLE_TARGET_CNTR
 extern struct fid_cntr*                 shmem_transport_ofi_target_cntrfd;
 #endif
 #if ENABLE_MANUAL_PROGRESS
@@ -1092,7 +1090,7 @@ void shmem_transport_atomic(shmem_transport_ctx_t* ctx, void *target, const void
     SHMEM_TRANSPORT_OFI_CTX_LOCK(ctx);
     SHMEM_TRANSPORT_OFI_CNTR_INC(&ctx->pending_put_cntr);
     do {
-        ret = fi_inject_atomic(shmem_transport_ofi_cntr_epfd,
+        ret = fi_inject_atomic(ctx->ep,
                                source,
                                1,
                                GET_DEST(dst),
@@ -1100,14 +1098,12 @@ void shmem_transport_atomic(shmem_transport_ctx_t* ctx, void *target, const void
                                key,
                                datatype,
                                op);
-    } while(try_again(ret,&polled));
-
-    shmem_transport_ofi_pending_put_counter++;
+    } while(try_again(ctx, ret,&polled));
 }
 
 
 static inline
-void shmem_transport_triggered_atomic_small(const void *source, size_t len,
+void shmem_transport_triggered_atomic_small(shmem_transport_ctx_t* ctx, const void *source, size_t len,
                                             int pe, shm_internal_op_t op,
                                             shm_internal_datatype_t datatype,
                                             shmem_transport_ct_t *ct, long threshold)
@@ -1128,7 +1124,7 @@ void shmem_transport_triggered_atomic_small(const void *source, size_t len,
     shmem_internal_assert(SHMEM_Dtsize[datatype] == len);
 
     do {
-        ret = fi_atomic(shmem_transport_ofi_cntr_epfd,
+        ret = fi_atomic(ctx->ep,
                         source,
                         1,
                         NULL,
@@ -1138,38 +1134,9 @@ void shmem_transport_triggered_atomic_small(const void *source, size_t len,
                         datatype,
                         op,
                         &triggered_ctx);
-    } while(try_again(ret,&polled));
-
-    shmem_transport_ofi_pending_put_counter++;
+    } while(try_again(ctx, ret,&polled));
 }
 
-
-static inline
-void shmem_transport_atomic_set(void *target, const void *source, size_t len,
-                                int pe, int datatype)
-{
-    int ret = 0;
-    uint64_t dst = (uint64_t) pe;
-    uint64_t polled = 0;
-    uint64_t key;
-    uint8_t *addr;
-
-    shmem_transport_ofi_get_mr(target, pe, &addr, &key);
-
-    shmem_internal_assert(SHMEM_Dtsize[datatype] == len);
-
-    do {
-        ret = fi_inject_atomic(ctx->ep,
-                               source,
-                               1,
-                               GET_DEST(dst),
-                               (uint64_t) addr,
-                               key,
-                               datatype,
-                               op);
-    } while (try_again(ctx, ret, &polled));
-    SHMEM_TRANSPORT_OFI_CTX_UNLOCK(ctx);
-}
 
 
 static inline
@@ -1462,7 +1429,7 @@ void shmem_transport_ct_create(shmem_transport_ct_t **ct_ptr)
         return;
     }
 
-    ret = fi_ep_bind(shmem_transport_ofi_cntr_epfd, &myct->fid, FI_WRITE);
+    ret = fi_ep_bind(shmem_transport_ofi_target_ep, &myct->fid, FI_WRITE);
     if (ret!=0) {
         RAISE_WARN_STR("ep_bind cntr_epfd2trigger_cntr failed");
         return;
