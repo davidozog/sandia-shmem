@@ -8,8 +8,9 @@
 
 #define TEST_B2B_COLLECTIVE(NAME, ROUTINE, ...)                                 \
     do {                                                                        \
+        int i;                                                                  \
         if (me == 0) printf("%s... ", NAME);                                    \
-        for (int i = 0; i < NITERS; i++) {                                      \
+        for (i = 0; i < NITERS; i++) {                                          \
             errors += ROUTINE(__VA_ARGS__);                                     \
         }                                                                       \
         error_check(&errors, &total_errors, NAME, me);                          \
@@ -31,6 +32,7 @@ void error_check(int *errors, int *total_errors, char *routine, int me) {
 
 int main(void)
 {
+    size_t i;
     int errors = 0, total_errors = 0;
     shmem_init();
     int me = shmem_my_pe();
@@ -38,7 +40,7 @@ int main(void)
     long *dest = shmem_malloc(NELEMS * sizeof(long));
     long *src = shmem_malloc(NELEMS * sizeof(long));
 
-    for (size_t i = 0; i < NELEMS; i++) {
+    for (i = 0; i < NELEMS; i++) {
         src[i] = me;
     }
 

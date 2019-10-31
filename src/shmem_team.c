@@ -387,7 +387,7 @@ int shmem_internal_team_destroy(shmem_internal_team_t *team)
     } else {
         for (size_t i = 0; i < PSYNC_CHUNK_SIZE; i++) {
             shmem_internal_psync_pool[team->psync_idx * PSYNC_CHUNK_SIZE+ i] = SHMEM_SYNC_VALUE;
-            shmem_internal_psync_barrier_pool[team->psync_idx * PSYNC_CHUNK_SIZE + i] = SHMEM_SYNC_VALUE;
+            shmem_internal_psync_barrier_pool[team->psync_idx * SHMEM_SYNC_SIZE + i] = SHMEM_SYNC_VALUE;
         }
         shmem_internal_bit_set(psync_pool_avail, sizeof(uint64_t), team->psync_idx);
     }
@@ -426,7 +426,7 @@ size_t shmem_internal_team_choose_psync(shmem_internal_team_t *team, shmem_inter
 {
     switch (op) {
         case SYNC:
-            return team->psync_idx * PSYNC_CHUNK_SIZE;
+            return team->psync_idx * SHMEM_SYNC_SIZE;
 
         default:
             for (int i = 0; i < N_PSYNCS_PER_TEAM; i++) {
@@ -436,7 +436,7 @@ size_t shmem_internal_team_choose_psync(shmem_internal_team_t *team, shmem_inter
                 }
             }
 
-            size_t psync = team->psync_idx * PSYNC_CHUNK_SIZE;
+            size_t psync = team->psync_idx * SHMEM_SYNC_SIZE;
             shmem_internal_sync(team->start, team->stride, team->size,
                                 &shmem_internal_psync_barrier_pool[psync]);
 
