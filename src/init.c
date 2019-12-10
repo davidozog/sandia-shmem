@@ -37,7 +37,7 @@
 #include "runtime.h"
 #include "build_info.h"
 #include "shmem_team.h"
-#include "sos_errno.h"
+#include "shmem_errno.h"
 
 #if defined(ENABLE_REMOTE_VIRTUAL_ADDRESSING) && defined(__linux__)
 #include <sys/personality.h>
@@ -441,8 +441,8 @@ shmem_internal_init(int tl_requested, int *tl_provided)
     }
 
     ret = shmem_internal_team_init();
-    if (ret != SOS_SUCCESS) {
-        RETURN_ERROR_MSG("Initialization of teams failed (%s)\n", sos_strerror(ret));
+    if (ret != SHMEM_INTERNAL_SUCCESS) {
+        RETURN_ERROR_MSG("Initialization of teams failed (%s)\n", shmem_internal_strerror(ret));
         goto cleanup;
     }
     teams_initialized = 1;

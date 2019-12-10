@@ -16,7 +16,7 @@
 #include "shmem_team.h"
 #include "shmem_collectives.h"
 #include "shmem_remote_pointer.h"
-#include "sos_errno.h"
+#include "shmem_errno.h"
 
 #include <math.h>
 
@@ -45,7 +45,7 @@ static unsigned char *psync_pool_avail_reduced;
  * This function is useful within a loop across PE IDs, and sets 'start',
  * 'stride' and 'size' accordingly upon exiting the loop. It also assumes
  * 'start' and 'stride' are initialized to a negative number and 'size' to 0.
- * If an inconsistent stride is found, returns SOS_EOTHER. */
+ * If an inconsistent stride is found, returns SHMEM_INTERNAL_EOTHER. */
 static inline
 int check_for_linear_stride(int pe, int *start, int *stride, int *size)
 {
@@ -58,11 +58,11 @@ int check_for_linear_stride(int pe, int *start, int *stride, int *size)
     } else if ((pe - *start) % *stride != 0) {
         RAISE_WARN_MSG("Detected non-uniform stride inserting PE %d into <%d, %d, %d>\n",
                        pe, *start, *stride, *size);
-        return SOS_EOTHER;
+        return SHMEM_INTERNAL_EOTHER;
     } else {
         (*size)++;
     }
-    return SOS_SUCCESS;
+    return SHMEM_INTERNAL_SUCCESS;
 }
 
 /* Team Management Routines */
@@ -105,7 +105,7 @@ int shmem_internal_team_init(void)
             if (ret_ptr == NULL) continue;
 
             int ret = check_for_linear_stride(pe, &start, &stride, &size);
-            if (ret != SOS_SUCCESS) {
+            if (ret != SHMEM_INTERNAL_SUCCESS) {
                 start = shmem_internal_my_pe;
                 stride = 1;
                 size = 1;
@@ -126,7 +126,7 @@ int shmem_internal_team_init(void)
     if (shmem_internal_params.TEAMS_MAX > N_PSYNC_BYTES * CHAR_BIT) {
         RETURN_ERROR_MSG("Requested %ld teams, but only %d are supported\n",
                          shmem_internal_params.TEAMS_MAX, N_PSYNC_BYTES * CHAR_BIT);
-        return SOS_ERESOURCE_EXHAUST;
+        return SHMEM_INTERNAL_ERESOURCE_EXHAUST;
     }
 
     if (shmem_internal_params.TEAMS_MAX < SHMEM_TEAMS_MIN)
@@ -151,7 +151,7 @@ int shmem_internal_team_init(void)
      * */
     long psync_len = shmem_internal_params.TEAMS_MAX * (PSYNC_CHUNK_SIZE + SHMEM_SYNC_SIZE);
     shmem_internal_psync_pool = shmem_internal_shmalloc(sizeof(long) * psync_len);
-    if (NULL == shmem_internal_psync_pool) return SOS_ESHMALLOC_FAIL;
+    if (NULL == shmem_internal_psync_pool) return SHMEM_INTERNAL_ESHMALLOC_FAIL;
 
     for (long i = 0; i < psync_len; i++) {
         shmem_internal_psync_pool[i] = SHMEM_SYNC_VALUE;
@@ -174,7 +174,7 @@ int shmem_internal_team_init(void)
     shmem_internal_bit_clear(psync_pool_avail, N_PSYNC_BYTES, SHMEM_TEAM_WORLD_INDEX);
     shmem_internal_bit_clear(psync_pool_avail, N_PSYNC_BYTES, SHMEM_TEAM_SHARED_INDEX);
 
-    return SOS_SUCCESS;
+    return SHMEM_INTERNAL_SUCCESS;
 }
 
 void shmem_internal_team_fini(void)
@@ -198,10 +198,10 @@ int shmem_internal_team_translate_pe(shmem_internal_team_t *src_team, int src_pe
     int src_pe_world, dest_pe = -1;
 
     if (src_team == SHMEMX_TEAM_INVALID || dest_team == SHMEMX_TEAM_INVALID)
-        return SOS_EINVALID_TEAM;
+        return -1;
 
     if (src_pe > src_team->size)
-        return SOS_EINVALID_ARG;
+        return -1;
 
     src_pe_world = src_team->start + src_pe * src_team->stride;
 
@@ -221,7 +221,7 @@ int shmem_internal_team_split_strided(shmem_internal_team_t *parent_team, int PE
     *new_team = SHMEMX_TEAM_INVALID;
 
     if (parent_team == SHMEMX_TEAM_INVALID) {
-        return SOS_SUCCESS;
+        return SHMEM_INTERNAL_SUCCESS;
     }
 
     int global_PE_start = shmem_internal_team_pe(parent_team, PE_start);
@@ -233,14 +233,14 @@ int shmem_internal_team_split_strided(shmem_internal_team_t *parent_team, int PE
         RAISE_WARN_MSG("Invalid <start, stride, size>: child <%d, %d, %d>, parent <%d, %d, %d>\n",
                        PE_start, PE_stride, PE_size,
                        parent_team->start, parent_team->stride, parent_team->size);
-        return SOS_EINVALID_ARG;
+        return SHMEM_INTERNAL_EINVALID_ARG;
     }
 
     if (global_PE_start >= shmem_internal_num_pes ||
         global_PE_end >= shmem_internal_num_pes) {
         RAISE_WARN_MSG("Starting PE (%d) or ending PE (%d) is invalid\n",
                        global_PE_start, global_PE_end);
-        return SOS_EINVALID_ARG;
+        return SHMEM_INTERNAL_EINVALID_ARG;
     }
 
     int my_pe = shmem_internal_pe_in_active_set(shmem_internal_my_pe,
@@ -313,7 +313,7 @@ int shmem_internal_team_split_strided(shmem_internal_team_t *parent_team, int PE
                          global_PE_start, PE_stride, PE_size,
                          parent_team->start, parent_team->stride, parent_team->size);
     else
-        return SOS_SUCCESS;
+        return SHMEM_INTERNAL_SUCCESS;
 }
 
 int shmem_internal_team_split_2d(shmem_internal_team_t *parent_team, int xrange,
@@ -362,14 +362,14 @@ int shmem_internal_team_split_2d(shmem_internal_team_t *parent_team, int xrange,
 
     shmem_internal_team_release_psyncs(parent_team, SYNC);
 
-    return SOS_SUCCESS;
+    return SHMEM_INTERNAL_SUCCESS;
 }
 
 int shmem_internal_team_destroy(shmem_internal_team_t *team)
 {
 
     if (team == SHMEMX_TEAM_INVALID) {
-        return SOS_EINVALID_TEAM;
+        return SHMEM_INTERNAL_EINVALID_TEAM;
     } else if (shmem_internal_bit_fetch(psync_pool_avail, team->psync_idx)) {
         RAISE_ERROR_STR("Destroying a team without an active pSync");
     } else {
@@ -392,7 +392,7 @@ int shmem_internal_team_destroy(shmem_internal_team_t *team)
         free(team);
     }
 
-    return SOS_SUCCESS;
+    return SHMEM_INTERNAL_SUCCESS;
 }
 
 /* Returns a psync from the given team that can be safely used for the
