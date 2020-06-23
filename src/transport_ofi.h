@@ -32,6 +32,7 @@
 #include "shmem_atomic.h"
 #include "shmem_team.h"
 #include <sys/types.h>
+#include <pthread.h>
 
 
 #if !defined(ENABLE_HARD_POLLING)
@@ -313,18 +314,14 @@ extern struct fid_ep* shmem_transport_ofi_target_ep;
 static inline
 void shmem_transport_probe(void)
 {
-#if defined(ENABLE_MANUAL_PROGRESS)
-#  ifdef USE_THREAD_COMPLETION
+#if defined(ENABLE_MANUAL_PROGRESS) /* FIXME */
     if (0 == pthread_mutex_trylock(&shmem_transport_ofi_progress_lock)) {
-#  endif
         struct fi_cq_entry buf;
         int ret = fi_cq_read(shmem_transport_ofi_target_cq, &buf, 1);
         if (ret == 1)
             RAISE_WARN_STR("Unexpected event");
-#  ifdef USE_THREAD_COMPLETION
         pthread_mutex_unlock(&shmem_transport_ofi_progress_lock);
     }
-#  endif
 #endif
 
     return;

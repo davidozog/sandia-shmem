@@ -29,6 +29,7 @@
 #include <stdint.h>
 #include <inttypes.h>
 #include <netdb.h>
+#include <pthread.h>
 
 #if HAVE_FNMATCH_H
 #include <fnmatch.h>
@@ -147,6 +148,19 @@ int shmem_transport_dtype_table[] = {
 #undef SHM_INTERNAL_UINT16
 #undef SHM_INTERNAL_UINT32
 #undef SHM_INTERNAL_UINT64
+
+static pthread_t                shmem_transport_ofi_progress_thread;
+static int                      shmem_transport_ofi_progress_thread_enabled;
+
+static void *shmem_transport_ofi_progress_thread_func(void *arg)
+{
+    while (__atomic_load_n(&shmem_transport_ofi_progress_thread_enabled, __ATOMIC_ACQUIRE)) {
+        //shmem_transport_probe();
+	printf("prog...\n");
+        usleep(shmem_internal_params.PROGRESS_INTERVAL);
+    }
+    return NULL;
+}
 
 /* Need a syscall to gettid() because glibc doesn't provide a wrapper
  * (see gettid manpage in the NOTES section): */
@@ -1153,7 +1167,7 @@ int query_for_fabric(struct fabric_info *info)
                                    for put with signal implementation */
 #endif
     hints.addr_format         = FI_FORMAT_UNSPEC;
-    domain_attr.data_progress = FI_PROGRESS_AUTO;
+    domain_attr.data_progress = FI_PROGRESS_MANUAL; /* FIXME */
     domain_attr.resource_mgmt = FI_RM_ENABLED;
 #ifdef ENABLE_MR_SCALABLE
                                 /* Scalable, offset-based addressing, formerly FI_MR_SCALABLE */
@@ -1498,6 +1512,9 @@ int shmem_transport_init(void)
 
     shmem_transport_ctx_default.options = SHMEMX_CTX_BOUNCE_BUFFER;
 
+    if (shmem_internal_params.PROGRESS_INTERVAL > 0)
+        shmem_transport_ofi_progress_thread_enabled = 1;
+
     ret = shmem_transport_ofi_target_ep_init();
     if (ret != 0) return ret;
 
@@ -1587,6 +1604,10 @@ int shmem_transport_startup(void)
 
     ret = populate_av();
     if (ret != 0) return ret;
+
+    if (shmem_internal_params.PROGRESS_INTERVAL > 0)
+        pthread_create(&shmem_transport_ofi_progress_thread, NULL,
+                       &shmem_transport_ofi_progress_thread_func, NULL);
 
     return 0;
 }
@@ -1779,6 +1800,12 @@ int shmem_transport_fini(void)
         OFI_CHECK_ERROR_MSG(ret, "STX context close failed (%s)\n", fi_strerror(errno));
     }
     if (shmem_transport_ofi_stx_pool) free(shmem_transport_ofi_stx_pool);
+
+    if (shmem_internal_params.PROGRESS_INTERVAL > 0) {
+        __atomic_store_n(&shmem_transport_ofi_progress_thread_enabled, 0, __ATOMIC_RELEASE);
+        pthread_join(shmem_transport_ofi_progress_thread, NULL);
+    }
+    OFI_CHECK_ERROR_MSG(ret, "Progress thread join returned (%d)\n", ret);
 
     ret = fi_close(&shmem_transport_ofi_target_ep->fid);
     OFI_CHECK_ERROR_MSG(ret, "Target endpoint close failed (%s)\n", fi_strerror(errno));
