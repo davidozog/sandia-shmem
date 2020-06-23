@@ -111,7 +111,7 @@ SHMEM_INTERNAL_ENV_DEF(OFI_DISABLE_MULTIRAIL, bool, false, SHMEM_INTERNAL_ENV_CA
                        "Disable usage of multirail functionality")
 #endif
 
-#ifdef USE_UCX
+#if defined(USE_UCX) || defined(USE_OFI)
 SHMEM_INTERNAL_ENV_DEF(PROGRESS_INTERVAL, long, 1000, SHMEM_INTERNAL_ENV_CAT_TRANSPORT,
                        "Polling interval for progress thread in microseconds (0 to disable)")
 #endif

@@ -32,6 +32,7 @@
 #include <stdint.h>
 #include <inttypes.h>
 #include <netdb.h>
+#include <pthread.h>
 
 #if HAVE_FNMATCH_H
 #include <fnmatch.h>
@@ -165,6 +166,19 @@ int shmem_transport_dtype_table[] = {
 #undef SHM_INTERNAL_UINT16
 #undef SHM_INTERNAL_UINT32
 #undef SHM_INTERNAL_UINT64
+
+static pthread_t                shmem_transport_ofi_progress_thread;
+static int                      shmem_transport_ofi_progress_thread_enabled;
+
+static void *shmem_transport_ofi_progress_thread_func(void *arg)
+{
+    while (__atomic_load_n(&shmem_transport_ofi_progress_thread_enabled, __ATOMIC_ACQUIRE)) {
+        //shmem_transport_probe();
+	printf("prog...\n");
+        usleep(shmem_internal_params.PROGRESS_INTERVAL);
+    }
+    return NULL;
+}
 
 /* Need a syscall to gettid() because glibc doesn't provide a wrapper
  * (see gettid manpage in the NOTES section): */
@@ -1889,6 +1903,9 @@ int shmem_transport_init(void)
 
     shmem_transport_ctx_default.options = SHMEMX_CTX_BOUNCE_BUFFER;
 
+    if (shmem_internal_params.PROGRESS_INTERVAL > 0)
+        shmem_transport_ofi_progress_thread_enabled = 1;
+
     ret = shmem_transport_ofi_target_ep_init();
     if (ret != 0) return ret;
 
@@ -1978,6 +1995,10 @@ int shmem_transport_startup(void)
 
     ret = populate_av();
     if (ret != 0) return ret;
+
+    if (shmem_internal_params.PROGRESS_INTERVAL > 0)
+        pthread_create(&shmem_transport_ofi_progress_thread, NULL,
+                       &shmem_transport_ofi_progress_thread_func, NULL);
 
     return 0;
 }
@@ -2171,8 +2192,13 @@ int shmem_transport_fini(void)
     }
     if (shmem_transport_ofi_stx_pool) free(shmem_transport_ofi_stx_pool);
 
-#if defined(ENABLE_MR_SCALABLE)
-#if defined(ENABLE_REMOTE_VIRTUAL_ADDRESSING)
+    if (shmem_internal_params.PROGRESS_INTERVAL > 0) {
+        __atomic_store_n(&shmem_transport_ofi_progress_thread_enabled, 0, __ATOMIC_RELEASE);
+        pthread_join(shmem_transport_ofi_progress_thread, NULL);
+    }
+    OFI_CHECK_ERROR_MSG(ret, "Progress thread join returned (%d)\n", ret);
+
+#if defined(ENABLE_MR_SCALABLE) && defined(ENABLE_REMOTE_VIRTUAL_ADDRESSING)
     ret = fi_close(&shmem_transport_ofi_target_mrfd->fid);
     OFI_CHECK_ERROR_MSG(ret, "Target MR close failed (%s)\n", fi_strerror(errno));
 #else
