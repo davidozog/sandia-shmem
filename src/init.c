@@ -147,6 +147,10 @@ shmem_internal_shutdown(void)
 
     shmem_internal_finalized = 1;
 
+#ifdef USE_OFI
+    shmem_transport_progress_thread_fini();
+#endif
+
     shmem_internal_team_fini();
 
     shmem_transport_fini();
@@ -516,6 +520,10 @@ shmem_internal_heap_postinit(void)
 
     shmem_internal_randr_init();
     randr_initialized = 1;
+
+#ifdef USE_OFI
+    shmem_transport_progress_thread_init();
+#endif
 
     atexit(shmem_internal_shutdown_atexit);
     shmem_internal_initialized = 1;

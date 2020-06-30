@@ -170,15 +170,73 @@ int shmem_transport_dtype_table[] = {
 static pthread_t                shmem_transport_ofi_progress_thread;
 static int                      shmem_transport_ofi_progress_thread_enabled;
 
+
 static void *shmem_transport_ofi_progress_thread_func(void *arg)
 {
     while (__atomic_load_n(&shmem_transport_ofi_progress_thread_enabled, __ATOMIC_ACQUIRE)) {
-        //shmem_transport_probe();
-	printf("prog...\n");
+        shmem_transport_full_probe();
         usleep(shmem_internal_params.PROGRESS_INTERVAL);
     }
     return NULL;
 }
+
+
+void shmem_transport_progress_thread_init(void)
+{
+    if (shmem_internal_params.PROGRESS_INTERVAL > 0)
+        pthread_create(&shmem_transport_ofi_progress_thread, NULL,
+                       &shmem_transport_ofi_progress_thread_func, NULL);
+    return;
+}
+
+
+void shmem_transport_progress_thread_fini(void)
+{
+    if (shmem_internal_params.PROGRESS_INTERVAL > 0) {
+        __atomic_store_n(&shmem_transport_ofi_progress_thread_enabled, 0, __ATOMIC_RELEASE);
+        pthread_join(shmem_transport_ofi_progress_thread, NULL);
+    }
+    return;
+}
+
+
+void shmem_transport_full_probe(void)
+{
+#if defined(ENABLE_PROGRESS_THREAD)
+#  ifdef USE_THREAD_COMPLETION
+    if (0 == pthread_mutex_trylock(&shmem_transport_ofi_progress_lock)) {
+#  endif
+        for (long i = 0; i < shmem_internal_params.TEAMS_MAX; i++) {
+            if (shmem_internal_team_pool[i] != NULL) {
+                for (int j = 0; j < shmem_internal_team_pool[i]->contexts_len; j++) {
+                    if (shmem_internal_team_pool[i]->contexts[j] != NULL) {
+                        struct fi_cq_entry buf;
+                        if (!shmem_internal_team_pool[i]->contexts[j]->options & SHMEM_CTX_PRIVATE) {
+                            int ret = fi_cq_read(shmem_internal_team_pool[i]->contexts[j]->cq, &buf, 1);
+                            if (ret == 1)
+                                RAISE_WARN_STR("Unexpected event");
+                        }
+                    }
+                }
+            }
+        }
+        struct fi_cq_entry buf;
+        int ret = fi_cq_read(shmem_transport_ofi_target_cq, &buf, 1);
+        if (ret == 1)
+            RAISE_WARN_STR("Unexpected event");
+
+        ret = fi_cq_read(shmem_transport_ctx_default.cq, &buf, 1);
+        if (ret == 1)
+            RAISE_WARN_STR("Unexpected event");
+
+#  ifdef USE_THREAD_COMPLETION
+        pthread_mutex_unlock(&shmem_transport_ofi_progress_lock);
+    }
+#  endif
+#endif
+    return;
+}
+
 
 /* Need a syscall to gettid() because glibc doesn't provide a wrapper
  * (see gettid manpage in the NOTES section): */
@@ -516,7 +574,6 @@ int shmem_transport_ofi_stx_search_shared(long threshold)
 
     return stx_idx;
 }
-
 
 
 static inline
@@ -1996,10 +2053,6 @@ int shmem_transport_startup(void)
     ret = populate_av();
     if (ret != 0) return ret;
 
-    if (shmem_internal_params.PROGRESS_INTERVAL > 0)
-        pthread_create(&shmem_transport_ofi_progress_thread, NULL,
-                       &shmem_transport_ofi_progress_thread_func, NULL);
-
     return 0;
 }
 
@@ -2022,8 +2075,9 @@ int shmem_transport_ctx_create(struct shmem_internal_team_t *team, long options,
         id = team->contexts_len;
 
         size_t i = team->contexts_len;
+        team->contexts = realloc(team->contexts, (i + shmem_transport_ofi_grow_size) *
+                                                  sizeof(shmem_transport_ctx_t*));
         team->contexts_len += shmem_transport_ofi_grow_size;
-        team->contexts = realloc(team->contexts, team->contexts_len * sizeof(shmem_transport_ctx_t*));
 
         if (team->contexts == NULL) {
             RAISE_ERROR_STR("Out of memory when allocating OFI ctx array");
