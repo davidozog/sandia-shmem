@@ -70,9 +70,9 @@ int shmem_internal_team_create_ctx(shmem_internal_team_t *team, long options, sh
 
 int shmem_internal_ctx_get_team(shmem_ctx_t ctx, shmem_internal_team_t **team);
 
-long * shmem_internal_team_choose_psync(shmem_internal_team_t *team, shmem_internal_team_op_t op);
+long * shmem_internal_team_choose_psync(shmem_internal_team_t *team, shmem_internal_team_op_t op, size_t * const index);
 
-void shmem_internal_team_release_psyncs(shmem_internal_team_t *team, shmem_internal_team_op_t op);
+void shmem_internal_team_release_psyncs(shmem_internal_team_t *team, shmem_internal_team_op_t op, const size_t * const index);
 
 static inline
 int shmem_internal_team_pe(shmem_internal_team_t *team, int pe)

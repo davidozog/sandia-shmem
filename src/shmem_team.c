@@ -190,15 +190,15 @@ cleanup:
     }
     if (shmem_internal_psync_pool) {
         shmem_internal_free(shmem_internal_psync_pool);
-        shmem_internal_team_pool = NULL;
+        shmem_internal_psync_pool = NULL;
     }
     if (psync_pool_avail) {
         shmem_internal_free(psync_pool_avail);
-        shmem_internal_team_pool = NULL;
+        psync_pool_avail = NULL;
     }
     if (team_ret_val) {
         shmem_internal_free(team_ret_val);
-        shmem_internal_team_pool = NULL;
+        team_ret_val = NULL;
     }
 
     return -1;
@@ -274,7 +274,8 @@ int shmem_internal_team_split_strided(shmem_internal_team_t *parent_team, int PE
     int my_pe = shmem_internal_pe_in_active_set(shmem_internal_my_pe,
                                                 global_PE_start, PE_stride, PE_size);
 
-    long *psync = shmem_internal_team_choose_psync(parent_team, REDUCE);
+    size_t index;
+    long *psync = shmem_internal_team_choose_psync(parent_team, REDUCE, &index);
     shmem_internal_team_t *myteam = NULL;
     *team_ret_val = 0;
     *team_ret_val_reduced = 0;
@@ -334,22 +335,24 @@ int shmem_internal_team_split_strided(shmem_internal_team_t *parent_team, int PE
         }
     }
 
+    shmem_internal_team_release_psyncs(parent_team, REDUCE, &index);
+
     /* This barrier on the parent team eliminates problematic race conditions
      * during psync allocation between back-to-back team creations. */
-    psync = shmem_internal_team_choose_psync(parent_team, SYNC);
+    psync = shmem_internal_team_choose_psync(parent_team, SYNC, NULL);
 
     shmem_internal_barrier(parent_team->start, parent_team->stride, parent_team->size, psync);
 
-    shmem_internal_team_release_psyncs(parent_team, SYNC);
+    shmem_internal_team_release_psyncs(parent_team, SYNC, NULL);
 
     /* This OR reduction assures all PEs return the same value.  */
-    psync = shmem_internal_team_choose_psync(parent_team, REDUCE);
+    psync = shmem_internal_team_choose_psync(parent_team, REDUCE, &index);
 
     shmem_internal_op_to_all(team_ret_val_reduced, team_ret_val, 1, sizeof(int),
                              parent_team->start, parent_team->stride, parent_team->size, NULL,
                              psync, SHM_INTERNAL_MAX, SHM_INTERNAL_INT);
 
-    shmem_internal_team_release_psyncs(parent_team, REDUCE);
+    shmem_internal_team_release_psyncs(parent_team, REDUCE, &index);
 
     /* If no team was available, print some team triplet info and return nonzero. */
     if (my_pe >= 0 && myteam != NULL && myteam->psync_idx == -1) {
@@ -423,11 +426,11 @@ int shmem_internal_team_split_2d(shmem_internal_team_t *parent_team, int xrange,
         }
     }
 
-    long *psync = shmem_internal_team_choose_psync(parent_team, SYNC);
+    long *psync = shmem_internal_team_choose_psync(parent_team, SYNC, NULL);
 
     shmem_internal_barrier(parent_start, parent_stride, parent_size, psync);
 
-    shmem_internal_team_release_psyncs(parent_team, SYNC);
+    shmem_internal_team_release_psyncs(parent_team, SYNC, NULL);
 
     return 0;
 }
@@ -463,8 +466,10 @@ int shmem_internal_team_destroy(shmem_internal_team_t *team)
 }
 
 /* Returns a psync from the given team that can be safely used for the
- * specified collective operation. */
-long * shmem_internal_team_choose_psync(shmem_internal_team_t *team, shmem_internal_team_op_t op)
+ * specified collective operation. The "index" is set to the chosen psync index
+ * and must be passed to 'shmem_internal_team_release_psyncs' (unless the op is
+ * SYNC) */
+long * shmem_internal_team_choose_psync(shmem_internal_team_t *team, shmem_internal_team_op_t op, size_t * const index)
 {
 
     switch (op) {
@@ -475,6 +480,7 @@ long * shmem_internal_team_choose_psync(shmem_internal_team_t *team, shmem_inter
             for (int i = 0; i < N_PSYNCS_PER_TEAM; i++) {
                 if (team->psync_avail[i]) {
                     team->psync_avail[i] = 0;
+                    *index = i;
                     return &shmem_internal_psync_pool[(team->psync_idx + i) * PSYNC_CHUNK_SIZE];
                 }
             }
@@ -487,12 +493,13 @@ long * shmem_internal_team_choose_psync(shmem_internal_team_t *team, shmem_inter
                 team->psync_avail[i] = 1;
             }
             team->psync_avail[0] = 0;
+            *index = 0;
 
-            return &shmem_internal_psync_pool[psync];
+            return &shmem_internal_psync_pool[team->psync_idx * PSYNC_CHUNK_SIZE];
     }
 }
 
-void shmem_internal_team_release_psyncs(shmem_internal_team_t *team, shmem_internal_team_op_t op)
+void shmem_internal_team_release_psyncs(shmem_internal_team_t *team, shmem_internal_team_op_t op, const size_t * const index)
 {
     switch (op) {
         case SYNC:
@@ -501,6 +508,7 @@ void shmem_internal_team_release_psyncs(shmem_internal_team_t *team, shmem_inter
             }
             break;
         default:
+            team->psync_avail[*index] = 1;
             break;
     }
 

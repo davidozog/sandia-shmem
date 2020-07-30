@@ -185,9 +185,9 @@ shmemx_sync(shmemx_team_t team)
     SHMEM_ERR_CHECK_TEAM_VALID(team);
 
     shmem_internal_team_t *myteam = (shmem_internal_team_t *)team;
-    long *psync = shmem_internal_team_choose_psync(myteam, SYNC);
+    long *psync = shmem_internal_team_choose_psync(myteam, SYNC, NULL);
     shmem_internal_sync(myteam->start, myteam->stride, myteam->size, psync);
-    shmem_internal_team_release_psyncs(myteam, SYNC);
+    shmem_internal_team_release_psyncs(myteam, SYNC, NULL);
     return 0;
 }
 
@@ -198,9 +198,9 @@ shmemx_team_sync(shmemx_team_t team)
     SHMEM_ERR_CHECK_TEAM_VALID(team);
 
     shmem_internal_team_t *myteam = (shmem_internal_team_t *)team;
-    long *psync = shmem_internal_team_choose_psync(myteam, SYNC);
+    long *psync = shmem_internal_team_choose_psync(myteam, SYNC, NULL);
     shmem_internal_sync(myteam->start, myteam->stride, myteam->size, psync);
-    shmem_internal_team_release_psyncs(myteam, SYNC);
+    shmem_internal_team_release_psyncs(myteam, SYNC, NULL);
     return 0;
 }
 
@@ -238,13 +238,16 @@ shmemx_team_sync(shmemx_team_t team)
         SHMEM_ERR_CHECK_SYMMETRIC(dest, sizeof(TYPE)*nreduce);          \
         SHMEM_ERR_CHECK_SYMMETRIC(source, sizeof(TYPE)*nreduce);        \
         TYPE *pWrk = NULL;                                              \
+        size_t psync_index;                                             \
                                                                         \
         shmem_internal_team_t *myteam = (shmem_internal_team_t *)team;  \
-        long *psync = shmem_internal_team_choose_psync(myteam, REDUCE); \
+        long *psync = shmem_internal_team_choose_psync(myteam, REDUCE,  \
+                                                       &psync_index);   \
         shmem_internal_op_to_all(dest, source, nreduce, sizeof(TYPE),   \
                    myteam->start, myteam->stride, myteam->size, pWrk,   \
                    psync, IOP, ITYPE);                                  \
-        shmem_internal_team_release_psyncs(myteam, REDUCE);             \
+        shmem_internal_team_release_psyncs(myteam, REDUCE,              \
+                                           &psync_index);               \
         return 0;                                                       \
     }
 SHMEM_BIND_C_COLL_INTS(`SHMEM_DEF_TO_ALL', `and', `SHM_INTERNAL_BAND')
@@ -315,13 +318,15 @@ shmemx_broadcastmem(shmemx_team_t team, void *dest, const void *source,
     SHMEM_ERR_CHECK_TEAM_VALID(team);
     SHMEM_ERR_CHECK_SYMMETRIC(dest, nelems);
     SHMEM_ERR_CHECK_SYMMETRIC(source, nelems);
+    size_t psync_index;
 
     shmem_internal_team_t *myteam = (shmem_internal_team_t *)team;
-    long *psync = shmem_internal_team_choose_psync(myteam, BCAST);
+    long *psync = shmem_internal_team_choose_psync(myteam, BCAST,
+                                                   &psync_index);
     shmem_internal_bcast(dest, source, nelems, PE_root, myteam->start,
                          myteam->stride, myteam->size,
                          psync, 1);
-    shmem_internal_team_release_psyncs(myteam, BCAST);
+    shmem_internal_team_release_psyncs(myteam, BCAST, &psync_index);
     return 0;
 }
 
@@ -336,13 +341,15 @@ shmemx_broadcastmem(shmemx_team_t team, void *dest, const void *source,
         SHMEM_ERR_CHECK_TEAM_VALID(team);                               \
         SHMEM_ERR_CHECK_SYMMETRIC(dest, nelems * sizeof(TYPE));         \
         SHMEM_ERR_CHECK_SYMMETRIC(source, nelems * sizeof(TYPE));       \
+        size_t psync_index;                                             \
                                                                         \
         shmem_internal_team_t *myteam = (shmem_internal_team_t *)team;  \
-        long *psync = shmem_internal_team_choose_psync(myteam, BCAST);  \
+        long *psync = shmem_internal_team_choose_psync(myteam, BCAST,   \
+                                                       &psync_index);   \
         shmem_internal_bcast(dest, source, nelems * sizeof(TYPE),       \
                              PE_root, myteam->start, myteam->stride,    \
                              myteam->size, psync, 1);                   \
-        shmem_internal_team_release_psyncs(myteam, BCAST);              \
+        shmem_internal_team_release_psyncs(myteam, BCAST, &psync_index);\
         return 0;                                                       \
     }
 
@@ -386,14 +393,16 @@ shmem_collect64(void *target, const void *source, size_t nlong,
         SHMEM_ERR_CHECK_TEAM_VALID(team);                              \
         SHMEM_ERR_CHECK_SYMMETRIC(dest, nelems * sizeof(TYPE));        \
         SHMEM_ERR_CHECK_SYMMETRIC(source, nelems * sizeof(TYPE));      \
+        size_t psync_index;                                            \
                                                                        \
         shmem_internal_team_t *myteam = (shmem_internal_team_t *)team; \
         long *psync = shmem_internal_team_choose_psync(myteam,         \
-                                                        COLLECT);      \
+                                               COLLECT, &psync_index); \
         shmem_internal_collect(dest, source, nelems * sizeof(TYPE),    \
                                myteam->start, myteam->stride,          \
                                myteam->size, psync);                   \
-        shmem_internal_team_release_psyncs(myteam, COLLECT);           \
+        shmem_internal_team_release_psyncs(myteam, COLLECT,            \
+                                           &psync_index);              \
         return 0;                                                      \
     }
 
@@ -407,12 +416,14 @@ shmemx_collectmem(shmemx_team_t team, void *dest, const void *source,
     SHMEM_ERR_CHECK_TEAM_VALID(team);
     SHMEM_ERR_CHECK_SYMMETRIC(dest, nelems);
     SHMEM_ERR_CHECK_SYMMETRIC(source, nelems);
+    size_t psync_index;
 
     shmem_internal_team_t *myteam = (shmem_internal_team_t *)team;
-    long *psync = shmem_internal_team_choose_psync(myteam, COLLECT);
+    long *psync = shmem_internal_team_choose_psync(myteam, COLLECT,
+                                                   &psync_index);
     shmem_internal_collect(dest, source, nelems, myteam->start,
                            myteam->stride, myteam->size, psync);
-    shmem_internal_team_release_psyncs(myteam, COLLECT);
+    shmem_internal_team_release_psyncs(myteam, COLLECT, &psync_index);
     return 0;
 }
 
@@ -454,14 +465,16 @@ shmem_fcollect64(void *target, const void *source, size_t nlong,
         SHMEM_ERR_CHECK_TEAM_VALID(team);                               \
         SHMEM_ERR_CHECK_SYMMETRIC(dest, nelems * sizeof(TYPE));         \
         SHMEM_ERR_CHECK_SYMMETRIC(source, nelems * sizeof(TYPE));       \
+        size_t psync_index;                                             \
                                                                         \
         shmem_internal_team_t *myteam = (shmem_internal_team_t *)team;  \
-        long *psync = shmem_internal_team_choose_psync(myteam,          \
-                                                        COLLECT);       \
+        long *psync = shmem_internal_team_choose_psync(myteam, COLLECT, \
+                                                       &psync_index);   \
         shmem_internal_fcollect(dest, source, nelems * sizeof(TYPE),    \
                                 myteam->start, myteam->stride,          \
                                 myteam->size, psync);                   \
-        shmem_internal_team_release_psyncs(myteam, COLLECT);            \
+        shmem_internal_team_release_psyncs(myteam, COLLECT,             \
+                                           &psync_index);               \
         return 0;                                                       \
     }
 
@@ -475,12 +488,14 @@ shmemx_fcollectmem(shmemx_team_t team, void *dest, const void *source,
     SHMEM_ERR_CHECK_TEAM_VALID(team);
     SHMEM_ERR_CHECK_SYMMETRIC(dest, nelems);
     SHMEM_ERR_CHECK_SYMMETRIC(source, nelems);
+    size_t psync_index;
 
     shmem_internal_team_t *myteam = (shmem_internal_team_t *)team;
-    long *psync = shmem_internal_team_choose_psync(myteam, COLLECT);
+    long *psync = shmem_internal_team_choose_psync(myteam, COLLECT,
+                                                   &psync_index);
     shmem_internal_fcollect(dest, source, nelems, myteam->start,
                             myteam->stride, myteam->size, psync);
-    shmem_internal_team_release_psyncs(myteam, COLLECT);
+    shmem_internal_team_release_psyncs(myteam, COLLECT, &psync_index);
     return 0;
 }
 
@@ -522,14 +537,16 @@ shmem_alltoall64(void *dest, const void *source, size_t nelems, int PE_start,
         SHMEM_ERR_CHECK_TEAM_VALID(team);                              \
         SHMEM_ERR_CHECK_SYMMETRIC(dest, nelems * sizeof(TYPE));        \
         SHMEM_ERR_CHECK_SYMMETRIC(source, nelems * sizeof(TYPE));      \
+        size_t psync_index;                                            \
                                                                        \
         shmem_internal_team_t *myteam = (shmem_internal_team_t *)team; \
         long *psync = shmem_internal_team_choose_psync(myteam,         \
-                                                        ALLTOALL);     \
+                                              ALLTOALL, &psync_index); \
         shmem_internal_alltoall(dest, source, nelems * sizeof(TYPE),   \
                                myteam->start, myteam->stride,          \
                                myteam->size, psync);                   \
-        shmem_internal_team_release_psyncs(myteam, ALLTOALL);          \
+        shmem_internal_team_release_psyncs(myteam, ALLTOALL,           \
+                                           &psync_index);              \
         return 0;                                                      \
     }
 
@@ -543,12 +560,14 @@ shmemx_alltoallmem(shmemx_team_t team, void *dest, const void *source,
     SHMEM_ERR_CHECK_TEAM_VALID(team);
     SHMEM_ERR_CHECK_SYMMETRIC(dest, nelems);
     SHMEM_ERR_CHECK_SYMMETRIC(source, nelems);
+    size_t psync_index;
 
     shmem_internal_team_t *myteam = (shmem_internal_team_t *)team;
-    long *psync = shmem_internal_team_choose_psync(myteam, ALLTOALL);
+    long *psync = shmem_internal_team_choose_psync(myteam, ALLTOALL,
+                                                   &psync_index);
     shmem_internal_alltoall(dest, source, nelems, myteam->start,
                             myteam->stride, myteam->size, psync);
-    shmem_internal_team_release_psyncs(myteam, ALLTOALL);
+    shmem_internal_team_release_psyncs(myteam, ALLTOALL, &psync_index);
     return 0;
 }
 
@@ -598,13 +617,15 @@ shmem_alltoalls64(void *dest, const void *source, ptrdiff_t dst, ptrdiff_t sst,
         SHMEM_ERR_CHECK_TEAM_VALID(team);                                    \
         SHMEM_ERR_CHECK_SYMMETRIC(dest, nelems * sizeof(TYPE));              \
         SHMEM_ERR_CHECK_SYMMETRIC(source, nelems * sizeof(TYPE));            \
+        size_t psync_index;                                                  \
                                                                              \
         shmem_internal_team_t *myteam = (shmem_internal_team_t *)team;       \
-        long *psync = shmem_internal_team_choose_psync(myteam, ALLTOALL);    \
+        long *psync = shmem_internal_team_choose_psync(myteam, ALLTOALL,     \
+                                                       &psync_index);        \
         shmem_internal_alltoalls(dest, source, dst, sst, sizeof(TYPE),       \
                                  nelems, myteam->start, myteam->stride,      \
                                  myteam->size, psync);                       \
-        shmem_internal_team_release_psyncs(myteam, ALLTOALL);                \
+        shmem_internal_team_release_psyncs(myteam, ALLTOALL, &psync_index);  \
         return 0;                                                            \
     }
 
@@ -618,12 +639,14 @@ shmemx_alltoallsmem(shmemx_team_t team, void *dest, const void *source,
     SHMEM_ERR_CHECK_TEAM_VALID(team);
     SHMEM_ERR_CHECK_SYMMETRIC(dest, nelems);
     SHMEM_ERR_CHECK_SYMMETRIC(source, nelems);
+    size_t psync_index;
 
     shmem_internal_team_t *myteam = (shmem_internal_team_t *)team;
-    long *psync = shmem_internal_team_choose_psync(myteam, ALLTOALL);
+    long *psync = shmem_internal_team_choose_psync(myteam, ALLTOALL,
+                                                   &psync_index);
     shmem_internal_alltoalls(dest, source, dst, sst, 1, nelems,
                              myteam->start, myteam->stride, myteam->size,
                              psync);
-    shmem_internal_team_release_psyncs(myteam, ALLTOALL);
+    shmem_internal_team_release_psyncs(myteam, ALLTOALL, &psync_index);
     return 0;
 }

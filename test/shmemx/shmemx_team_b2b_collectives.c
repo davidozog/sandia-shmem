@@ -37,8 +37,10 @@
         if (me == 0) printf("%s... ", NAME);                                    \
         int i;                                                                  \
         for (i = 0; i < NITERS; i++) {                                          \
+            printf("%d ", i);                                                   \
             errors += ROUTINE(__VA_ARGS__);                                     \
         }                                                                       \
+        printf("\n");                                                           \
         error_check(&errors, &total_errors, NAME, me);                          \
     } while (0)
 
@@ -68,6 +70,12 @@ int main(void)
         src[i] = me;
     }
 
+        for (int i = 0; i < NITERS; i++) {
+            printf("%d ", i);
+                shmem_barrier_all();
+        }
+    if (me == 0) printf("barrier_all passed.\n");
+    TEST_B2B_COLLECTIVE("sync_all", shmemx_team_sync, SHMEMX_TEAM_WORLD);
     TEST_B2B_COLLECTIVE("broadcast", shmemx_long_broadcast, SHMEMX_TEAM_WORLD, dest, src, NELEMS, 0);
     TEST_B2B_COLLECTIVE("reduce", shmemx_long_sum_reduce, SHMEMX_TEAM_WORLD, dest, src, NELEMS);
     TEST_B2B_COLLECTIVE("collect", shmemx_long_collect, SHMEMX_TEAM_WORLD, dest, src, NELEMS);
