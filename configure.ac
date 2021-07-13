@@ -452,6 +452,46 @@ if test "$enable_shr_atomics" != "no" -a "$transport_xpmem" = "yes" -a "$transpo
     AC_DEFINE([USE_SHR_ATOMICS], [1], [If defined, the shared memory layer will perform processor atomics.])
 fi
 
+# Accelerators - start
+CHECK_ZE(
+    [accelerator_ze="yes"],
+    [accelerator_ze="no"])
+
+CHECK_CUDA(
+    [accelerator_cuda="yes"],
+    [accelerator_cuda="no"])
+
+# For now, disabling the option of both libraries being requested
+if test -n "$with_cuda" -a "$with_cuda" != "no" -a -n "$with_ze" -a "$with_ze" != "no" ; then
+    AC_MSG_ERROR([Cannot choose both CUDA and ZE libraries for accelerator, see --help for details])
+elif test -n "$with_ze" -a "$with_ze" != "no" ; then
+    accelerator_ze="yes"
+    AC_DEFINE([USE_ZE], [1], [Define if ZE is present and requested])
+elif test -n "$with_cuda" -a "$with_cuda" != "no" ; then
+    accelerator_cuda="yes"
+    AC_DEFINE([USE_CUDA], [1], [Define if CUDA is present and requested])
+else
+    accelerator_ze="no"
+    accelerator_cuda="no"
+fi
+
+AM_CONDITIONAL([USE_ZE], [test "$accelerator_ze" = "yes"])
+AM_CONDITIONAL([USE_CUDA], [test "$accelerator_cuda" = "yes"])
+
+AC_ARG_ENABLE([xpu-ipc],
+    [AC_HELP_STRING([--enable-xpu-ipc],
+                    [Enable XPU IPC for on-node communications (default: disabled)])])
+
+if test "$enable_xpu_ipc" != "no"; then
+    if test "$accelerator_ze" = "yes" -o "$accelerator_cuda" = "yes"; then
+        if test "$transport_xpmem" = "yes" -o "$transport_cma" = "yes"; then
+            AC_DEFINE([USE_XPU_IPC], [1], [If defined, the XPU IPC will be used for on-node intra-xpu communication])
+        fi
+    fi
+fi
+
+# Accelerators - end
+
 AC_ARG_ENABLE([pmi-simple], [AC_HELP_STRING([--enable-pmi-simple],
               [Use MPICH simple PMI-1 library for process management])])
 AC_ARG_ENABLE([pmi-mpi], [AC_HELP_STRING([--enable-pmi-mpi],
@@ -781,6 +821,12 @@ fi
 if test -n "$with_xpmem" -a "$with_xpmem" != "no" -a "$with_xpmem" != "yes" ; then
   DISTCHECK_CONFIGURE_FLAGS="$DISTCHECK_CONFIGURE_FLAGS --with-xpmem=${with_xpmem}"
 fi
+if test -n "$with_ze" -a "$with_ze" != "no" -a "$with_ze" != "yes" ; then
+  DISTCHECK_CONFIGURE_FLAGS="$DISTCHECK_CONFIGURE_FLAGS --with-ze=${with_ze}"
+fi
+if test -n "$with_cuda" -a "$with_cuda" != "no" -a "$with_cuda" != "yes" ; then
+  DISTCHECK_CONFIGURE_FLAGS="$DISTCHECK_CONFIGURE_FLAGS --with-cuda=${with_cuda}"
+fi
 if test -n "$with_pmi" -a "$with_pmi" != "no" -a "$with_pmi" != "yes" ; then
   DISTCHECK_CONFIGURE_FLAGS="$DISTCHECK_CONFIGURE_FLAGS --with-pmi=${with_pmi}"
 fi
@@ -835,6 +881,22 @@ if test "$transport_xpmem" = "yes" ; then
     LIBS="$LIBS $XPMEM_LIBS"
     WRAPPER_COMPILER_EXTRA_LDFLAGS="$XPMEM_LDFLAGS"
     WRAPPER_COMPILER_EXTRA_LIBS="$XPMEM_LIBS"
+fi
+
+if test "$accelerator_ze" = "yes" ; then
+    CPPFLAGS="$CPPFLAGS $ZE_CPPFLAGS"
+    LDFLAGS="$LDFLAGS $ZE_LDFLAGS"
+    LIBS="$LIBS $ZE_LIBS"
+    WRAPPER_COMPILER_EXTRA_LDFLAGS="$ZE_LDFLAGS"
+    WRAPPER_COMPILER_EXTRA_LIBS="$ZE_LIBS"
+fi
+
+if test "$accelerator_cuda" = "yes" ; then
+    CPPFLAGS="$CPPFLAGS $CUDA_CPPFLAGS"
+    LDFLAGS="$LDFLAGS $CUDA_LDFLAGS"
+    LIBS="$LIBS $CUDA_LIBS"
+    WRAPPER_COMPILER_EXTRA_LDFLAGS="$CUDA_LDFLAGS"
+    WRAPPER_COMPILER_EXTRA_LIBS="$CUDA_LIBS"
 fi
 
 CPPFLAGS="$CPPFLAGS $pmi_CPPFLAGS"
@@ -922,6 +984,10 @@ echo "Transports:"
 echo "  Portals 4:      $transport_portals4"
 echo "  OFI:            $transport_ofi"
 echo "  UCX:            $transport_ucx"
+echo ""
+echo "Accelerators:"
+echo "  ZE:             $accelerator_ze"
+echo "  CUDA:           $accelerator_cuda"
 echo ""
 echo "On Node Communication:"
 echo "  XPMEM:          $transport_xpmem"

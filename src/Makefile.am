@@ -65,7 +65,10 @@ libsma_la_SOURCES = \
 	perf_counters_c.c \
 	backtrace.c \
 	shmem_team.c \
-	shmem_team.h
+	shmem_team.h \
+	xpu_c.c \
+	shmem_accelerator.c \
+	shmem_accelerator.h
 
 BUILT_SOURCES = $(GEN_BINDINGS) \
 		build_info.h \

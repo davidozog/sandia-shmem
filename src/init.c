@@ -37,6 +37,7 @@
 #include "runtime.h"
 #include "build_info.h"
 #include "shmem_team.h"
+#include "shmem_accelerator.h"
 
 #if defined(ENABLE_REMOTE_VIRTUAL_ADDRESSING) && defined(__linux__)
 #include <sys/personality.h>
@@ -124,6 +125,8 @@ shmem_internal_shutdown(void)
     shmem_internal_randr_fini();
 
     shmem_internal_symmetric_fini();
+
+    shmem_internal_accelerator_fini();
     shmem_runtime_fini();
 }
 
@@ -164,6 +167,7 @@ shmem_internal_init(int tl_requested, int *tl_provided)
     int randr_initialized     = 0;
     int teams_initialized     = 0;
     int enable_node_ranks     = 0;
+    int accelerator_initialized = 0;
 
     /* Parse environment variables into shmem_internal_params */
     ret = shmem_internal_parse_env();
@@ -308,6 +312,16 @@ shmem_internal_init(int tl_requested, int *tl_provided)
     shmem_internal_data_length = (long) ((char*) &_end - (char*) &__data_start);
 #endif
 
+#if defined(USE_ZE)
+    /* Initialize accelerator */
+    ret = shmem_internal_accelerator_init(shmem_internal_my_pe);
+    if (ret != 0) {
+        RETURN_ERROR_MSG("Initialization of accelerators failed (%d)\n", ret);
+        goto cleanup;
+    }
+    accelerator_initialized = 1;
+#endif
+
     /* create symmetric heap */
     ret = shmem_internal_symmetric_init();
     if (0 != ret) {
@@ -448,6 +462,11 @@ shmem_internal_init(int tl_requested, int *tl_provided)
     if (NULL != shmem_internal_data_base) {
         shmem_internal_symmetric_fini();
     }
+
+    if (accelerator_initialized) {
+        shmem_internal_accelerator_fini();
+    }
+
     if (runtime_initialized) {
         shmem_runtime_fini();
     }

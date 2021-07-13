@@ -43,7 +43,7 @@ SHMEM_INTERNAL_ENV_DEF(DISABLE_ASLR_CHECK, bool, false, SHMEM_INTERNAL_ENV_CAT_O
 #endif
 
 SHMEM_INTERNAL_ENV_DEF(SYMMETRIC_HEAP_USE_MALLOC, bool, false, SHMEM_INTERNAL_ENV_CAT_OTHER,
-                        "Allocate the symmetric heap using malloc")
+                       "Allocate the symmetric heap using malloc")
 SHMEM_INTERNAL_ENV_DEF(BOUNCE_SIZE, size, DEFAULT_BOUNCE_SIZE, SHMEM_INTERNAL_ENV_CAT_OTHER,
                        "Maximum message size to bounce buffer")
 SHMEM_INTERNAL_ENV_DEF(MAX_BOUNCE_BUFFERS, long, 128, SHMEM_INTERNAL_ENV_CAT_OTHER,
@@ -122,3 +122,5 @@ SHMEM_INTERNAL_ENV_DEF(MPI_THREAD_LEVEL, string, "MPI_THREAD_SINGLE", SHMEM_INTE
 SHMEM_INTERNAL_ENV_DEF(BACKTRACE, string, "", SHMEM_INTERNAL_ENV_CAT_OTHER,
                        "Specify the mechanism to use for backtracing on failure")
 
+SHMEM_INTERNAL_ENV_DEF(SYMMETRIC_HEAP_USE_SHARED_ALLOC, bool, true, SHMEM_INTERNAL_ENV_CAT_OTHER,
+                       "Allocate the symmetric heap using shared alloc APIs provided by the device library")

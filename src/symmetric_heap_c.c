@@ -33,6 +33,7 @@
 #include "shmem_internal.h"
 #include "shmem_comm.h"
 #include "shmem_collectives.h"
+#include "shmem_accelerator.h"
 
 #ifdef ENABLE_PROFILING
 #include "pshmem.h"
@@ -84,7 +85,7 @@ void* dlmemalign(size_t, size_t);
  * only be a single 2MB pagesize present.
  * On success return 0, else -1.
  */
-
+#if !defined(USE_ZE) && !defined(USE_CUDA)
 #ifdef __linux__
 static int find_hugepage_dir(size_t page_size, char **directory)
 {
@@ -123,6 +124,7 @@ static int find_hugepage_dir(size_t page_size, char **directory)
     return ret;
 }
 #endif /* __linux__ */
+#endif /* !USE_ZE && !USE_CUDA */
 
 /* shmalloc and friends are defined to not be thread safe, so this is
    fine.  If they change that definition, this is no longer fine and
@@ -155,7 +157,7 @@ shmem_internal_get_next(intptr_t incr)
 #define CEILING(a,b)    ((uint64_t)(a) <= 0LL ? 0 : (FLOOR((a)-1,b) + (b)))
 #endif
 
-
+#if !defined(USE_ZE) && !defined(USE_CUDA)
 /* alloc VM space starting @ '_end' + 1GB */
 #define ONEGIG (1024UL*1024UL*1024UL)
 static void *mmap_alloc(size_t bytes)
@@ -225,7 +227,7 @@ static void *mmap_alloc(size_t bytes)
     }
     return ret;
 }
-
+#endif /* !USE_ZE && !USE_CUDA */
 
 int
 shmem_internal_symmetric_init(void)
@@ -234,6 +236,53 @@ shmem_internal_symmetric_init(void)
     shmem_internal_heap_length = shmem_internal_params.SYMMETRIC_SIZE +
                                  SHMEM_INTERNAL_HEAP_OVERHEAD;
 
+#if defined(USE_ZE)
+    /* Creating device descriptor that is needed for both shared and device memory allocation */
+    ze_device_mem_alloc_desc_t devMemAllocDesc = {
+      ZE_STRUCTURE_TYPE_DEVICE_MEM_ALLOC_DESC,
+      NULL,
+      0,
+      0
+    };
+
+    if (!shmem_internal_params.SYMMETRIC_HEAP_USE_SHARED_ALLOC) { 
+        /* Device memory alloc */
+        ZE_CHECK(zeMemAllocDevice(shmem_internal_ze_context, &devMemAllocDesc, shmem_internal_heap_length,
+                                  sizeof(uint32_t), shmem_internal_gpu_device, &shmem_internal_heap_base));
+    } else { 
+        /* Shared memory alloc */
+        ze_host_mem_alloc_desc_t hostMemAllocDesc = {
+          ZE_STRUCTURE_TYPE_HOST_MEM_ALLOC_DESC,
+          NULL,
+          0
+        };
+        printf("using shared alloc!\n");
+        ZE_CHECK(zeMemAllocShared(shmem_internal_ze_context, &devMemAllocDesc, &hostMemAllocDesc,
+                                  shmem_internal_heap_length, sizeof(uint32_t), shmem_internal_gpu_device,
+                                  &shmem_internal_heap_base) );
+    }
+
+    shmem_internal_heap_curr = shmem_internal_heap_base;
+
+    if (shmem_internal_params.DEBUG) {
+        ze_memory_allocation_properties_t mem_properties;
+        ZE_CHECK(zeMemGetAllocProperties(shmem_internal_ze_context, shmem_internal_heap_base,
+                                         &mem_properties, &shmem_internal_gpu_device) );
+
+        DEBUG_MSG("ZE memory allocation type: %s\n", 
+                  (mem_properties.type == ZE_MEMORY_TYPE_SHARED ? "shared" : "device"));
+    }
+#elif defined(USE_CUDA)
+    if (!shmem_internal_params.SYMMETRIC_HEAP_USE_SHARED_ALLOC) { 
+        /* Device memory alloc */
+        CU_CHECK(cudaMalloc(&shmem_internal_heap_base, shmem_internal_heap_length));
+    } else { 
+        /* Shared memory alloc */
+        CU_CHECK(cudaMallocManaged(&shmem_internal_heap_base, shmem_internal_heap_length,
+                                   cudaMemAttachGlobal));
+    }
+    shmem_internal_heap_curr = shmem_internal_heap_base;
+#else
     if (!shmem_internal_params.SYMMETRIC_HEAP_USE_MALLOC) {
         shmem_internal_heap_base =
             shmem_internal_heap_curr =
@@ -243,6 +292,7 @@ shmem_internal_symmetric_init(void)
             shmem_internal_heap_curr =
             malloc(shmem_internal_heap_length);
     }
+#endif
 
     return (NULL == shmem_internal_heap_base) ? -1 : 0;
 }
@@ -251,16 +301,21 @@ shmem_internal_symmetric_init(void)
 int
 shmem_internal_symmetric_fini(void)
 {
+#if defined(USE_ZE)
+    ZE_CHECK(zeMemFree(shmem_internal_ze_context, shmem_internal_heap_base) );
+#elif defined(USE_CUDA)
+    CU_CHECK(cudaFree(shmem_internal_heap_base));
+#else
     if (NULL != shmem_internal_heap_base) {
         if (!shmem_internal_params.SYMMETRIC_HEAP_USE_MALLOC) {
             munmap( (void*)shmem_internal_heap_base, (size_t)shmem_internal_heap_length );
         } else {
             free(shmem_internal_heap_base);
         }
-        shmem_internal_heap_length = 0;
-        shmem_internal_heap_base = shmem_internal_heap_curr = NULL;
     }
-
+#endif
+    shmem_internal_heap_length = 0;
+    shmem_internal_heap_base = shmem_internal_heap_curr = NULL;
     return 0;
 }
 
