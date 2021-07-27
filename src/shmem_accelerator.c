@@ -38,8 +38,7 @@ int shmem_internal_accelerator_init(int my_pe) {
   int gpu_device_found = 0;
   int fpga_device_found = 0;
 
-  //ZE_CHECK(zeInit(ZE_INIT_FLAG_GPU_ONLY));
-  ZE_CHECK(zeInit(0));
+  ZE_CHECK(zeInit(ZE_INIT_FLAG_GPU_ONLY));
 
   ZE_CHECK(zeDriverGet(&driver_count, NULL));
   if (driver_count == 0) {
