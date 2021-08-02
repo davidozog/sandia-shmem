@@ -1,0 +1,52 @@
+name: SOS-github-actions
+
+on: [push]
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  SOS_INSTALL_PREFIX: /home/gitaction/install/testing
+  OFI_INSTALL_DIR:    /home/gitaction/deps/libfabric/v1.13.0
+
+jobs:
+  test:
+    runs-on: self-hosted
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - config_name: ofi
+
+    steps:
+      - uses: actions/checkout@v2
+      #- name: Checkout libfabric
+      #  uses: actions/checkout@v2
+      #  with:
+      #    repository: ofiwg/libfabric
+      #    path: repos/libfabric
+      #- name: Build libfabric
+      #  run: |
+      #    cd repos/libfabric
+      #    ./autogen.sh
+      #    mkdir build; cd build
+      #    ../configure --prefix=${SOS_INSTALL_PREFIX}
+      #    make -j4
+      #    make install
+      - name: Build SOS
+        run: |
+          ./autogen.sh
+          mkdir build; cd build
+          ../configure --prefix=${SOS_INSTALL_PREFIX} --with-ofi=${OFI_INSTALL_DIR} --enable-pmi-simple
+          make -j4
+          make install
+
+      - run: echo "${HOME}/install/bin" >> $GITHUB_PATH
+      - name: Test SOS
+        run: |
+          echo "$PATH"
+          echo "$GITHUB_PATH"
+          cd build
+          make check TESTS= -j
+          make check
