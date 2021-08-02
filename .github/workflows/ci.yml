@@ -1,0 +1,38 @@
+name: SOS-github-actions
+
+on: [push]
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  SOS_INSTALL_PREFIX: install/sos
+
+jobs:
+  test:
+    runs-on: self-hosted
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - config_name: ofi
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Checkout libfabric
+        uses: actions/checkout@v2
+        with:
+          repository: ofiwg/libfabric
+          path: repos/libfabric
+      - name: Build libfabric
+        run: |
+          cd repos/libfabric
+          ./autogen.sh
+          mkdir build; cd build
+          ../configure --prefix=${SOS_INSTALL_PREFIX}
+          make -j3
+          make install
+
+      - run: whoami 
+      - run: groups
