@@ -7,7 +7,8 @@ defaults:
     shell: bash
 
 env:
-  SOS_INSTALL_PREFIX: /home/gitaction/install/testing
+  SOS_INSTALL_PREFIX: ${HOME}/install/testing
+  OFI_INSTALL_DIR:    ${HOME}/deps/libfabric/v1.13.0
 
 jobs:
   test:
@@ -18,30 +19,35 @@ jobs:
         include:
           - config_name: ofi
 
-    steps:
-      - uses: actions/checkout@v2
-      - name: Checkout libfabric
-        uses: actions/checkout@v2
-        with:
-          repository: ofiwg/libfabric
-          path: repos/libfabric
-      - name: Build libfabric
-        run: |
-          cd repos/libfabric
-          ./autogen.sh
-          mkdir build; cd build
-          ../configure --prefix=${SOS_INSTALL_PREFIX}
-          make -j3
-          make install
-      - name: Build SOS
-        run: |
-          ./autogen.sh
-          mkdir build; cd build
-          ../configure --prefix=${SOS_INSTALL_PREFIX} --with-ofi=${SOS_INSTALL_PREFIX} --enable-pmi-simple
-          make -j3
-          make install
+            steps:
+              - uses: actions/checkout@v2
+              #- name: Checkout libfabric
+              #  uses: actions/checkout@v2
+              #  with:
+              #    repository: ofiwg/libfabric
+              #    path: repos/libfabric
+              #- name: Build libfabric
+              #  run: |
+              #    cd repos/libfabric
+              #    ./autogen.sh
+              #    mkdir build; cd build
+              #    ../configure --prefix=${SOS_INSTALL_PREFIX}
+              #    make -j4
+              #    make install
+              - name: Build SOS
+                run: |
+                  ./autogen.sh
+                  mkdir build; cd build
+                  ../configure --prefix=${SOS_INSTALL_PREFIX} --with-ofi=${OFI_INSTALL_DIR} --enable-pmi-simple
+                  make -j4
+                  make install
 
-      - name: Test SOS
-        run: |
-          cd build
-          make check
+              - run: echo "${HOME}/install/bin" >> $GITHUB_PATH
+
+              - name: Test SOS
+                run: |
+                  echo "$PATH"
+                  echo "$GITHUB_PATH"
+                  cd build
+                  make check TESTS= -j
+                  make check
