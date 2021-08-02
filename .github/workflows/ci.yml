@@ -7,7 +7,7 @@ defaults:
     shell: bash
 
 env:
-  SOS_INSTALL_PREFIX: /install/sos
+  SOS_INSTALL_PREFIX: /home/gitaction/install/testing
 
 jobs:
   test:
@@ -33,6 +33,15 @@ jobs:
           ../configure --prefix=${SOS_INSTALL_PREFIX}
           make -j3
           make install
+      - name: Build SOS
+        run: |
+          ./autogen.sh
+          mkdir build; cd build
+          ../configure --prefix=${SOS_INSTALL_PREFIX} --with-ofi=${SOS_INSTALL_PREFIX} --enable-pmi-simple
+          make -j3
+          make install
 
-      - run: whoami 
-      - run: groups
+      - name: Test SOS
+        run: |
+          cd build
+          make check
