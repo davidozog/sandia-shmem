@@ -7,7 +7,7 @@ defaults:
     shell: bash
 
 env:
-  SOS_INSTALL_PREFIX: install/sos
+  SOS_INSTALL_PREFIX: /install/sos
 
 jobs:
   test:
