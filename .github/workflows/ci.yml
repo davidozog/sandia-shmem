@@ -51,3 +51,25 @@ jobs:
                   cd build
                   make check TESTS= -j
                   make check
+        include:
+          - config_name: cma
+
+            steps:
+              - uses: actions/checkout@v2
+              - name: Build SOS
+                run: |
+                  ./autogen.sh
+                  mkdir build; cd build
+                  ../configure --prefix=${SOS_INSTALL_PREFIX} --enable-error-checking --with-cma --enable-pmi-simple
+                  make -j4
+                  make install
+
+              - run: echo "${HOME}/install/bin" >> $GITHUB_PATH
+
+              - name: Test SOS
+                run: |
+                  echo "$PATH"
+                  echo "$GITHUB_PATH"
+                  cd build
+                  make check TESTS= -j
+                  make check
