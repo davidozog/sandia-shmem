@@ -29,7 +29,7 @@ ze_command_queue_handle_t shmem_internal_cmd_queue = NULL;
 ze_command_list_handle_t shmem_internal_cmd_list = NULL;
 
 #ifdef USE_XPU_IPC
-ze_ipc_mem_handle_t shmem_internal_mem_ipc_handle = NULL;
+ze_ipc_mem_handle_t shmem_internal_mem_ipc_handle;
 #endif
 
 int shmem_internal_accelerator_init(int my_pe) {
@@ -144,18 +144,9 @@ int shmem_internal_accelerator_fini(void) {
 
 #ifdef USE_XPU_IPC
 int shmem_internal_xpu_ipc_init(void) {
-  int value = 3;
-  ZE_CHECK(zeCommandListAppendMemoryFill(shmem_internal_cmd_list, shmem_internal_heap_base, 
-                                         (void *) &value, sizeof(value), shmem_internal_heap_length, 
-                                         NULL);
-  ZE_CHECK(zeCommandListClose(shmem_internal_cmd_list));
-  ZE_CHECK(zeCommandQueueExecuteCommandLists(shmem_internal_cmd_queue, 1, &shmem_internal_cmd_list, NULL));
-  ZE_CHECK(zeCommandQueueSynchronize(shmem_internal_cmd_queue, INT_MAX));
-  ZE_CHECK(zeCommandListReset(shmem_internal_cmd_list));
-
-  // TODO: For now doing it only for gpu driver; handle other drivers later
-  ZE_CHECK(zeDriverGetMemIpcHandle(shmem_internal_gpu_driver, shmem_internal_heap_base, 
-                                   &shmem_internal_mem_ipc_handle));  
+  /* TODO: Add support for IPC */
+  RAISE_WARN_MSG("No IPC support\n");
+  return 0;
 }
 #endif
 
