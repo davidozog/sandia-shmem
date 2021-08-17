@@ -48,8 +48,12 @@ static int validate_data(int i) {
     int errors = 0;
     int j;
     for (j = 0; j < NELEM; j++) {
+#ifdef ENABLE_DEPRECATED_TESTS
         int64_t expected = (shmem_my_pe() == i) ? i-1 : i;
-        if (dst[j] != expected) {
+#else
+        int64_t expected = i;
+#endif
+	if (dst[j] != expected) {
             printf("%d: Expected dst[%d] = %"PRId64", got dst[%d] = %"PRId64", iteration %d\n",
                    shmem_my_pe(), j, expected, j, dst[j], i);
             errors++;
