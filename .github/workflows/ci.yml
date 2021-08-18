@@ -4,6 +4,10 @@ defaults:
   run:
     shell: bash
 
+env:
+  SOS_INSTALL: ${{ github.workspace }}/install/sos
+  LIBFABRIC_INSTALL: ${{ github.workspace }}/install/libfabric
+
 jobs:
   test:
     runs-on: self-hosted
@@ -28,19 +32,17 @@ jobs:
         ./autogen.sh
         mkdir build
         cd build
-        ../configure --prefix=${PWD}/install
+        ../configure --prefix=${LIBFABRIC_INSTALL}
         make -j
         make install
     - name: Build SOS
       run: |
-        export LIBFABRIC_INSTALL=${PWD}/repos/libfabric/build/install
         ./autogen.sh
         mkdir build
         cd build
-        ../configure --prefix=${PWD}/install --with-ofi=${LIBFABRIC_INSTALL} --enable-pmi-simple --enable-error-checking --disable-cxx --disable-fortran ${{ matrix.sos_config_options}} --disable-libtool-wrapper
+        ../configure --prefix=${SOS_INSTALL} --with-ofi=${LIBFABRIC_INSTALL} --enable-pmi-simple --enable-error-checking --disable-cxx --disable-fortran ${{ matrix.sos_config_options}} --disable-libtool-wrapper
         make -j check TESTS=
         make install
     - name: Run SOS unit tests
       run: |
-        export PATH=${PWD}/build/install/bin:$PATH
-        make VERBOSE=1 TEST_RUNNER="oshrun -n 2" check 
+        make VERBOSE=1 TEST_RUNNER="${SOS_INSTALL}/bin/oshrun -n 2" check 
