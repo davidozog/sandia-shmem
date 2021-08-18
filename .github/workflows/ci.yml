@@ -1,0 +1,47 @@
+on: [push, pull_request]
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  test:
+    runs-on: self-hosted
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - config_name: ze
+            sos_config_options: --with-ze=/usr
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Checkout libfabric
+      uses: actions/checkout@v2
+      with:
+        repository: ofiwg/libfabric
+        path: repos/libfabric
+        ref: v1.13.x
+        token: ${{ secrets.PAT }}
+    - name: Build libfabric
+      run: |
+        cd repos/libfabric
+        ./autogen.sh
+        mkdir build
+        cd build
+        ../configure --prefix=${PWD}/install
+        make -j
+        make install
+        export LIBFABRIC_INSTALL=${PWD}/install
+    - name: Build SOS
+      run: |
+        ./autogen.sh
+        mkdir build
+        cd build
+        ../configure --prefix=${PWD}/install --with-ofi=${LIBFABRIC_INSTALL} --enable-pmi-simple --enable-error-checking --disable-cxx --disable-fortran ${{ matrix.sos_config_options}} --disable-libtool-wrapper
+        make -j check TESTS=
+        make install
+        export PATH=${PWD}/install/bin:$PATH
+    - name: Run SOS unit tests
+      run: |
+        make VERBOSE=1 TEST_RUNNER="oshrun -n 2" check 
