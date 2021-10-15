@@ -61,7 +61,7 @@ jobs:
           #  sos_config: --disable-fortran --with-cma --enable-error-checking --enable-profiling
           #              --enable-ofi-mr=basic --enable-av-map --enable-remote-virtual-addressing
           #              --enable-pmi-simple
-          # libfabric_version: v1.13.x
+          #  libfabric_version: v1.13.x
           - config_name: XPMEM RVA
             xpmem_version: master
             sos_config: --with-xpmem --enable-error-checking
@@ -242,7 +242,7 @@ jobs:
         include:
           - sos_transport: libfabric
             libfabric_version: v1.7.x
-            sos_transport_config: --with-ofi --without-ucx --without-portals4
+            sos_transport_config: --with-ofi=${LIBFABRIC_INSTALL_DIR} --without-ucx --without-portals4
             run_all_tests: true
             libevent_version: release-2.1.10-stable
             pmix_version: v4.1.1rc2
@@ -252,7 +252,7 @@ jobs:
             sos_pm_post: pterm
           - sos_transport: ucx
             ucx_version: v1.9.0
-            sos_transport_config: --with-ucx --without-ofi --without-portals4
+            sos_transport_config: --with-ucx=${UCX_INSTALL_DIR} --without-ofi --without-portals4
             run_all_tests: true
             libevent_version: release-2.1.10-stable
             pmix_version: v4.1.1rc2
@@ -288,7 +288,7 @@ jobs:
         id: cache-libfabric
         uses: actions/cache@v2
         with:
-          path: /usr
+          path: ${{ env.LIBFABRIC_INSTALL_DIR }}
           key: libfabric-${{ matrix.libfabric_version }}-${{ env.OS_NAME }}
       - name: Checkout libfabric
         if: ${{ matrix.sos_transport == 'libfabric' && steps.cache-libfabric.outputs.cache-hit != 'true' }}
@@ -303,7 +303,7 @@ jobs:
           cd repos/libfabric
           ./autogen.sh
           mkdir build; cd build
-          ../configure --prefix=/usr
+          ../configure --prefix=${LIBFABRIC_INSTALL_DIR}
           make -j
           sudo make install
 
@@ -313,7 +313,7 @@ jobs:
         id: cache-ucx
         uses: actions/cache@v2
         with:
-          path: /usr
+          path: ${{ env.UCX_INSTALL_DIR }}
           key: ucx-${{ matrix.ucx_version }}-${{ env.OS_NAME }}
       - name: Checkout UCX
         if: ${{ matrix.sos_transport == 'ucx' && steps.cache-ucx.outputs.cache-hit != 'true' }}
@@ -328,7 +328,7 @@ jobs:
           cd repos/ucx
           ./autogen.sh
           mkdir build; cd build
-          ../configure --prefix=/usr --enable-mt --disable-numa --without-java
+          ../configure --prefix=${UCX_INSTALL_DIR} --enable-mt --disable-numa --without-java
           make -j
           sudo make install
 
