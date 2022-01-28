@@ -53,7 +53,7 @@ static int validate_data(int i) {
 #else
         int64_t expected = i;
 #endif
-	if (dst[j] != expected) {
+        if (dst[j] != expected) {
             printf("%d: Expected dst[%d] = %"PRId64", got dst[%d] = %"PRId64", iteration %d\n",
                    shmem_my_pe(), j, expected, j, dst[j], i);
             errors++;
