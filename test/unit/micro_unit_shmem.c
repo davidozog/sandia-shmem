@@ -38,6 +38,7 @@
 #include <assert.h>
 #include <string.h>
 #include <ctype.h>
+#include <getopt.h>
 
 typedef enum {
     NUM_WRITE = 8,

@@ -42,6 +42,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <getopt.h>
+
 #include <shmem.h>
 
 #define Rfprintf if (shmem_my_pe() == 0) fprintf

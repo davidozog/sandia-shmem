@@ -31,6 +31,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <getopt.h>
 
 /* configuration parameters - setable by command line arguments */
 int npeers = 2;

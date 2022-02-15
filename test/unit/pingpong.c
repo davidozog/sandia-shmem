@@ -46,6 +46,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <assert.h>
+#include <getopt.h>
 
 static int atoi_scaled(char *s);
 

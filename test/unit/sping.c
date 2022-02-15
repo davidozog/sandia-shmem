@@ -38,6 +38,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <sys/time.h>
+#include <getopt.h>
 
 int getSize (char *);
 double gettime(void);

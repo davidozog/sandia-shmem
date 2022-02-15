@@ -166,6 +166,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <inttypes.h>
+#include <getopt.h>
 #if 0
 #include "config.h"
 #endif

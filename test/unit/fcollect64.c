@@ -41,6 +41,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <assert.h>
+#include <getopt.h>
 
 #define AMEG (1024UL*1024UL)
 #define AGIG (1024UL*1024UL*1024UL)
