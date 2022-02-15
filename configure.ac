@@ -289,14 +289,14 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
                         f(1);
                         ]]
                    )],
-                   [shmem_cv_c11_works="yes"], [shmem_cv_c11_works="no"])
+                   [shmem_cv_c11_works="no"], [shmem_cv_c11_works="no"])
 AS_IF([test "$shmem_cv_c11_works" = "no"],
       [AC_MSG_RESULT([no])
       CFLAGS="$ORIG_CFLAGS"
       AC_PROG_CC_C99
       ],
       [AC_MSG_RESULT([yes])
-      CFLAGS="-std=gnu11 $ORIG_CFLAGS"]
+      CFLAGS="-std=c99 $ORIG_CFLAGS"]
       )
 AC_LANG_POP([C])
 AM_CONDITIONAL([HAVE_C11], [test "$shmem_cv_c11_works" = "yes" -a "$enable_c11_checks" != "no"])

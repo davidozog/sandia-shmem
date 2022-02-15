@@ -494,7 +494,7 @@ static inline double shmem_internal_wtime(void)
 {
     double wtime = 0.0;
 
-#ifdef HAVE_CLOCK_GETTIME
+#ifdef CLOCK_MONOTONIC
     struct timespec tv;
     clock_gettime(CLOCK_MONOTONIC, &tv);
     wtime = tv.tv_sec;

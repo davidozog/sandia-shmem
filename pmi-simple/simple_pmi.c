@@ -62,6 +62,7 @@
    declared static.
  */
 
+#define h_addr h_addr_list[0] /* for backward compatibility */
 
 static int PMI_fd = -1;
 static int PMI_size = 1;
