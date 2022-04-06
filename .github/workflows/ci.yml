@@ -14,7 +14,6 @@ env:
   LIBEVENT_INSTALL_DIR: ${{ github.workspace }}/install/libevent
   PRRTE_INSTALL_DIR: ${{ github.workspace }}/install/prrte
   PMIX_INSTALL_DIR: ${{ github.workspace }}/install/pmix
-  SOS_BUILD_STATIC_OPTS: --disable-shared --enable-static
   XPMEM_INSTALL_DIR: ${{ github.workspace }}/install/xpmem
   SOS_PM: mpiexec.hydra
   SOS_PM_POST: true
@@ -257,7 +256,7 @@ jobs:
             sos_transport_config: --with-ofi=${LIBFABRIC_INSTALL_DIR} --without-ucx --without-portals4
             run_all_tests: true
             libevent_version: release-2.1.10-stable
-            pmix_version: v4.1.1rc2
+            pmix_version: v4.1.2
             prrte_version: v2.0
             sos_pm: prun
             sos_pm_pre: prte --daemonize --host localhost:4
@@ -267,7 +266,7 @@ jobs:
             sos_transport_config: --with-ucx=${UCX_INSTALL_DIR} --without-ofi --without-portals4
             run_all_tests: true
             libevent_version: release-2.1.10-stable
-            pmix_version: v4.1.1rc2
+            pmix_version: v4.1.2
             prrte_version: v2.0
             sos_pm: prun
             sos_pm_pre: prte --daemonize --host localhost:4
@@ -277,7 +276,7 @@ jobs:
             sos_transport_config: --with-portals4=${PORTALS4_INSTALL_DIR} --without-ofi --without-ucx
             run_all_tests: false
             libevent_version: release-2.1.10-stable
-            pmix_version: v4.1.1rc2
+            pmix_version: v4.1.2
             prrte_version: v2.0
             sos_pm: prun
             sos_pm_pre: prte --daemonize --host localhost:4
@@ -365,7 +364,7 @@ jobs:
           cd repos/portals4
           ./autogen.sh
           mkdir build; cd build
-          ../configure --prefix=${PORTALS4_INSTALL_DIR} --enable-zero-mrs --enable-reliable-udp --disable-pmi-from-portals ${SOS_BUILD_STATIC_OPTS}
+          ../configure --prefix=${PORTALS4_INSTALL_DIR} --enable-zero-mrs --enable-reliable-udp --disable-pmi-from-portals
           make -j
           make install
 
@@ -410,7 +409,7 @@ jobs:
         run: |
           cd repos/pmix
           ./autogen.pl
-          ./configure --prefix=${PMIX_INSTALL_DIR} --with-libevent=${LIBEVENT_INSTALL_DIR} --without-libev --disable-debug CFLAGS=-O3 ${SOS_BUILD_STATIC_OPTS}
+          ./configure --prefix=${PMIX_INSTALL_DIR} --with-libevent=${LIBEVENT_INSTALL_DIR} --without-libev --disable-debug CFLAGS=-O3
           make install
 
       # Build PRRTE
@@ -432,7 +431,7 @@ jobs:
         run: |
           cd repos/prrte
           ./autogen.pl
-          ./configure --prefix=${PRRTE_INSTALL_DIR} --with-pmix=${PMIX_INSTALL_DIR} --without-slurm --with-libevent=${LIBEVENT_INSTALL_DIR} --without-libev ${SOS_BUILD_STATIC_OPTS}
+          ./configure --prefix=${PRRTE_INSTALL_DIR} --with-pmix=${PMIX_INSTALL_DIR} --without-slurm --with-libevent=${LIBEVENT_INSTALL_DIR} --without-libev
           make install
 
       # SOS
