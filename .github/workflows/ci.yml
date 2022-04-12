@@ -410,7 +410,7 @@ jobs:
         run: |
           cd repos/pmix
           ./autogen.pl
-          ./configure --prefix=${PMIX_INSTALL_DIR} --with-libevent=${LIBEVENT_INSTALL_DIR} --without-libev --disable-debug CFLAGS=-O3 ${SOS_BUILD_STATIC_OPTS}
+          ./configure --prefix=${PMIX_INSTALL_DIR} --with-libevent=${LIBEVENT_INSTALL_DIR} --without-libev --disable-debug CFLAGS=-O3 --enable-static
           make install
 
       # Build PRRTE
@@ -433,6 +433,11 @@ jobs:
           cd repos/prrte
           ./autogen.pl
           ./configure --prefix=${PRRTE_INSTALL_DIR} --with-pmix=${PMIX_INSTALL_DIR} --without-slurm --with-libevent=${LIBEVENT_INSTALL_DIR} --without-libev ${SOS_BUILD_STATIC_OPTS}
+          make install
+
+          ## If Portals+PRRTE, rebuild PMIx (FIXME after resolving PRRTE w/ libev issues)
+          cd ../pmix
+          ./configure --prefix=${PMIX_INSTALL_DIR} --without-libevent --with-libev --disable-debug CFLAGS=-O3
           make install
 
       # SOS
