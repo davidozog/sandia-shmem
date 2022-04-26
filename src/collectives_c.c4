@@ -325,7 +325,7 @@ shmem_broadcastmem(shmem_team_t team, void *dest, const void *source,
                          psync, 1);
     shmem_internal_team_release_psyncs(myteam, BCAST);
     int team_root = myteam->start + PE_root * myteam->stride;
-    if (shmem_internal_my_pe == team_root)
+    if (shmem_internal_my_pe == team_root && dest != source)
         memcpy(dest, source, nelems);
     return 0;
 }
@@ -349,7 +349,7 @@ shmem_broadcastmem(shmem_team_t team, void *dest, const void *source,
                              myteam->size, psync, 1);                   \
         shmem_internal_team_release_psyncs(myteam, BCAST);              \
         int team_root = myteam->start + PE_root * myteam->stride;       \
-        if (shmem_internal_my_pe == team_root)                          \
+        if (shmem_internal_my_pe == team_root && dest != source)        \
             memcpy(dest, source, nelems * sizeof(TYPE));                \
         return 0;                                                       \
     }
