@@ -32,6 +32,7 @@
 #include "shmem_atomic.h"
 #include "shmem_team.h"
 #include <sys/types.h>
+#include <pthread.h>
 
 
 #if !defined(ENABLE_HARD_POLLING)
@@ -310,6 +311,10 @@ extern struct fid_ep* shmem_transport_ofi_target_ep;
             shmem_free_list_unlock(ctx->bounce_buffers);                        \
     } while (0)
 
+void shmem_transport_progress_thread_init(void);
+void shmem_transport_progress_thread_fini(void);
+void shmem_transport_full_probe(void);
+
 static inline
 void shmem_transport_probe(void)
 {
@@ -326,7 +331,6 @@ void shmem_transport_probe(void)
     }
 #  endif
 #endif
-
     return;
 }
 
