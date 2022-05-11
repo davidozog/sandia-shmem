@@ -45,4 +45,8 @@ jobs:
         make install
     - name: Run SOS unit tests
       run: |
-        make VERBOSE=1 TEST_RUNNER="${SOS_INSTALL}/bin/oshrun -n 2" check 
+        cd build
+        make VERBOSE=1 TEST_RUNNER="${SOS_INSTALL}/bin/oshrun -n 2" check | tee test_out.log
+    - name: Flush test results
+      if: always()
+      run: cat build/test_out.log 
