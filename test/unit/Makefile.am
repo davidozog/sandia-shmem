@@ -96,6 +96,7 @@ check_PROGRAMS = \
 	broadcast_active_set \
 	reduce_active_set \
 	reduce_in_place \
+	bcast_in_place \
 	collect_active_set \
 	atomic_bitwise \
 	nop_collectives \
@@ -105,6 +106,7 @@ check_PROGRAMS = \
 	many-ctx \
 	shmem_test \
 	shmem_ptr \
+	shmem_team_ptr \
 	shmem_malloc_with_hints \
 	put_signal \
 	put_signal_nbi \
