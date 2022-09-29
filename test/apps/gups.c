@@ -159,6 +159,7 @@
 
 #include <stdio.h>
 #include <shmem.h>
+#include <shmemx.h>
 #include <time.h>
 #include <sys/time.h>
 #include <stdint.h>
@@ -290,9 +291,15 @@ UpdateTable(uint64_t *Table,
 
       if (use_lock) shmem_set_lock(&HPCC_PELock[remote_pe]);
 #ifdef USE_GET_PUT
-      remote_val = (uint64_t) shmem_long_g((long *)&Table[index], remote_pe);
-      remote_val ^= ran;
-      shmem_long_p((long *)&Table[index], remote_val, remote_pe);
+      //remote_val = (uint64_t) shmem_long_g((long *)&Table[index], remote_pe);
+      //remote_val ^= ran;
+      remote_val = 1;
+      if (iterate == niterate - 1) {
+        printf("last iteration\n");
+        shmemx_put_no_more(SHMEM_CTX_DEFAULT, (long *)&Table[index], remote_val, remote_pe);
+      } else {
+        shmem_long_p((long *)&Table[index], remote_val, remote_pe);
+      }
 #else
       shmem_uint64_atomic_xor(&Table[index], ran, remote_pe);
 #endif

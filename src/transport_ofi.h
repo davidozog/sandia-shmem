@@ -537,6 +537,115 @@ int try_again(shmem_transport_ctx_t *ctx, const int ret, uint64_t *polled) {
     return 0;
 }
 
+static inline
+void shmem_user_put_scalar(shmem_transport_ctx_t* ctx, void *target, const
+                               void *source, size_t len, int pe)
+{
+    int ret = 0;
+    uint64_t dst = (uint64_t) pe;
+    uint64_t polled = 0;
+    uint64_t key;
+    uint8_t *addr;
+
+    shmem_transport_ofi_get_mr(target, pe, &addr, &key);
+
+    shmem_internal_assert(len <= shmem_transport_ofi_max_buffered_send);
+
+    SHMEM_TRANSPORT_OFI_CTX_LOCK(ctx);
+    SHMEM_TRANSPORT_OFI_CNTR_INC(&ctx->pending_put_cntr);
+
+    //do {
+
+    //    ret = fi_inject_write(ctx->ep,
+    //                          source,
+    //                          len,
+    //                          GET_DEST(dst),
+    //                          (uint64_t) addr,
+    //                          key);
+
+    //} while (try_again(ctx, ret, &polled));
+
+        const struct iovec msg_iov = {
+                                       .iov_base = (void *)source,
+                                       .iov_len = len
+                                     };
+        const struct fi_rma_iov rma_iov = {
+                                            .addr = (uint64_t) addr,
+                                            .len = len,
+                                            .key = key
+                                          };
+        const struct fi_msg_rma msg = {
+                                        .msg_iov = &msg_iov,
+                                        .desc = NULL,
+                                        .iov_count = 1,
+                                        .addr = GET_DEST(dst),
+                                        .rma_iov = &rma_iov,
+                                        .rma_iov_count = 1,
+                                        .context = NULL,
+                                        .data = 0
+                                      };
+
+        do {
+            ret = fi_writemsg(ctx->ep, &msg, FI_DELIVERY_COMPLETE | FI_INJECT | FI_MORE);
+        } while (try_again(ctx, ret, &polled));
+
+    SHMEM_TRANSPORT_OFI_CTX_UNLOCK(ctx);
+}
+
+static inline
+void shmem_user_put_no_more(shmem_transport_ctx_t* ctx, void *target, const
+                               void *source, size_t len, int pe)
+{
+    int ret = 0;
+    uint64_t dst = (uint64_t) pe;
+    uint64_t polled = 0;
+    uint64_t key;
+    uint8_t *addr;
+
+    shmem_transport_ofi_get_mr(target, pe, &addr, &key);
+
+    shmem_internal_assert(len <= shmem_transport_ofi_max_buffered_send);
+
+    SHMEM_TRANSPORT_OFI_CTX_LOCK(ctx);
+    SHMEM_TRANSPORT_OFI_CNTR_INC(&ctx->pending_put_cntr);
+
+    //do {
+
+    //    ret = fi_inject_write(ctx->ep,
+    //                          source,
+    //                          len,
+    //                          GET_DEST(dst),
+    //                          (uint64_t) addr,
+    //                          key);
+
+    //} while (try_again(ctx, ret, &polled));
+
+        const struct iovec msg_iov = {
+                                       .iov_base = (void *)source,
+                                       .iov_len = len
+                                     };
+        const struct fi_rma_iov rma_iov = {
+                                            .addr = (uint64_t) addr,
+                                            .len = len,
+                                            .key = key
+                                          };
+        const struct fi_msg_rma msg = {
+                                        .msg_iov = &msg_iov,
+                                        .desc = NULL,
+                                        .iov_count = 1,
+                                        .addr = GET_DEST(dst),
+                                        .rma_iov = &rma_iov,
+                                        .rma_iov_count = 1,
+                                        .context = NULL,
+                                        .data = 0
+                                      };
+
+        do {
+            ret = fi_writemsg(ctx->ep, &msg, FI_DELIVERY_COMPLETE | FI_INJECT );
+        } while (try_again(ctx, ret, &polled));
+
+    SHMEM_TRANSPORT_OFI_CTX_UNLOCK(ctx);
+}
 
 static inline
 void shmem_transport_put_scalar(shmem_transport_ctx_t* ctx, void *target, const
@@ -565,6 +674,7 @@ void shmem_transport_put_scalar(shmem_transport_ctx_t* ctx, void *target, const
                               key);
 
     } while (try_again(ctx, ret, &polled));
+
     SHMEM_TRANSPORT_OFI_CTX_UNLOCK(ctx);
 }
 
@@ -1061,6 +1171,7 @@ void shmem_transport_atomic(shmem_transport_ctx_t* ctx, void *target, const void
 {
     int ret = 0;
     uint64_t dst = (uint64_t) pe;
+    int dt = SHMEM_TRANSPORT_DTYPE(datatype);
     uint64_t polled = 0;
     uint64_t key;
     uint8_t *addr;
@@ -1072,16 +1183,35 @@ void shmem_transport_atomic(shmem_transport_ctx_t* ctx, void *target, const void
     SHMEM_TRANSPORT_OFI_CTX_LOCK(ctx);
     SHMEM_TRANSPORT_OFI_CNTR_INC(&ctx->pending_put_cntr);
 
-    do {
-        ret = fi_inject_atomic(ctx->ep,
-                               source,
-                               1,
-                               GET_DEST(dst),
-                               (uint64_t) addr,
-                               key,
-                               SHMEM_TRANSPORT_DTYPE(datatype),
-                               op);
-    } while (try_again(ctx, ret, &polled));
+    //do {
+    //    ret = fi_inject_atomic(ctx->ep,
+    //                           source,
+    //                           1,
+    //                           GET_DEST(dst),
+    //                           (uint64_t) addr,
+    //                           key,
+    //                           SHMEM_TRANSPORT_DTYPE(datatype),
+    //                           op);
+    //} while (try_again(ctx, ret, &polled));
+
+        const struct fi_ioc        msg_iov = { .addr = (void *)source, .count = 1 };
+        const struct fi_rma_ioc    rma_iov = { .addr = (uint64_t) addr, .count = 1, .key = key };
+        const struct fi_msg_atomic msg     = {
+                                               .msg_iov       = &msg_iov,
+                                               .desc          = NULL,
+                                               .iov_count     = 1,
+                                               .addr          = GET_DEST(dst),
+                                               .rma_iov       = &rma_iov,
+                                               .rma_iov_count = 1,
+                                               .datatype      = dt,
+                                               .op            = op,
+                                               .context       = NULL,
+                                               .data          = 0
+                                             };
+        do {
+            ret = fi_atomicmsg(ctx->ep, &msg, FI_INJECT );
+        } while (try_again(ctx, ret, &polled));
+
     SHMEM_TRANSPORT_OFI_CTX_UNLOCK(ctx);
 }
 
