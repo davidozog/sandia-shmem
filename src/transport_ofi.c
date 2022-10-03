@@ -45,6 +45,8 @@
 #include "runtime.h"
 #include "uthash.h"
 
+#include "shmem_collectives.h"
+
 struct fabric_info {
     struct fi_info *fabrics;
     struct fi_info *p_info;
@@ -1155,7 +1157,7 @@ int query_for_fabric(struct fabric_info *info)
                                    for put with signal implementation */
 #endif
     hints.addr_format         = FI_FORMAT_UNSPEC;
-    domain_attr.data_progress = FI_PROGRESS_AUTO;
+    domain_attr.data_progress = FI_PROGRESS_MANUAL;
     domain_attr.resource_mgmt = FI_RM_ENABLED;
 #ifdef ENABLE_MR_SCALABLE
                                 /* Scalable, offset-based addressing, formerly FI_MR_SCALABLE */
@@ -1282,7 +1284,7 @@ static int shmem_transport_ofi_target_ep_init(void)
 
     struct fabric_info* info = &shmem_transport_ofi_info;
     info->p_info->ep_attr->tx_ctx_cnt = 0;
-    info->p_info->caps = FI_RMA | FI_ATOMIC | FI_REMOTE_READ | FI_REMOTE_WRITE;
+    info->p_info->caps = FI_RMA | FI_ATOMIC | FI_REMOTE_READ | FI_REMOTE_WRITE | FI_LOCAL_COMM | FI_REMOTE_COMM;
 #if ENABLE_TARGET_CNTR
     info->p_info->caps |= FI_RMA_EVENT;
 #endif
@@ -1290,6 +1292,8 @@ static int shmem_transport_ofi_target_ep_init(void)
     info->p_info->mode = 0;
     info->p_info->tx_attr->mode = 0;
     info->p_info->rx_attr->mode = 0;
+    info->p_info->tx_attr->caps = 0;
+    info->p_info->rx_attr->caps = 0;
 
     ret = fi_endpoint(shmem_transport_ofi_domainfd,
                       info->p_info, &shmem_transport_ofi_target_ep, NULL);
@@ -1472,7 +1476,7 @@ int shmem_transport_init(void)
 
     /* The current bounce buffering implementation is only compatible with
      * providers that don't require FI_CONTEXT */
-    if (shmem_transport_ofi_info.p_info->mode & FI_CONTEXT) {
+    if (shmem_transport_ofi_info.p_info->mode & FI_CONTEXT || shmem_transport_ofi_info.p_info->mode & FI_CONTEXT2) {
         if (shmem_internal_my_pe == 0 && shmem_internal_params.BOUNCE_SIZE > 0) {
             DEBUG_STR("OFI provider requires FI_CONTEXT; disabling bounce buffering");
         }
