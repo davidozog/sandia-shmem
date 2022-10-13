@@ -109,7 +109,7 @@ SHMEM_INTERNAL_ENV_DEF(OFI_STX_DISABLE_PRIVATE, bool, false, SHMEM_INTERNAL_ENV_
                        "Disallow private contexts from having exclusive STX access")
 #endif
 
-#ifdef USE_UCX
+#if defined(USE_UCX) || defined(USE_OFI)
 SHMEM_INTERNAL_ENV_DEF(PROGRESS_INTERVAL, long, 1000, SHMEM_INTERNAL_ENV_CAT_TRANSPORT,
                        "Polling interval for progress thread in microseconds (0 to disable)")
 #endif
