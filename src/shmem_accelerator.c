@@ -166,22 +166,19 @@ int shmem_internal_xpu_ipc_init(void) {
 }
 #endif
 
-#else
+#else /* No CUDA or ZE */
 
 int shmem_internal_accelerator_init(int my_pe) {
-  RAISE_WARN_MSG("No accelerator library is found\n");
   return 0;
 }
 
 int shmem_internal_accelerator_fini(void) {
-  RAISE_WARN_MSG("No accelerator library is found\n");
   return 0;
 }
 
 #ifdef USE_XPU_IPC
 int shmem_internal_xpu_ipc_init(void) {
-  RAISE_WARN_MSG("No accelerator library is found\n");
   return 0;
 }
 #endif
-#endif
+#endif /* USE_ZE */

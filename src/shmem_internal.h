@@ -37,6 +37,8 @@ extern int shmem_internal_initialized;
 extern int shmem_internal_finalized;
 extern int shmem_internal_thread_level;
 
+extern int shmem_internal_heap_pre_initialized;
+
 extern void *shmem_internal_heap_base;
 extern long shmem_internal_heap_length;
 extern void *shmem_internal_data_base;

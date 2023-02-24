@@ -35,6 +35,8 @@
 #include "shmem_collectives.h"
 #include "shmem_accelerator.h"
 
+#include "shmemx.h"
+
 #ifdef ENABLE_PROFILING
 #include "pshmem.h"
 
@@ -232,6 +234,9 @@ static void *mmap_alloc(size_t bytes)
 int
 shmem_internal_symmetric_init(void)
 {
+
+    if (shmem_internal_heap_pre_initialized) return (NULL == shmem_internal_heap_base) ? -1 : 0;
+
     /* add library overhead such that the max can be shmalloc()'ed */
     shmem_internal_heap_length = shmem_internal_params.SYMMETRIC_SIZE +
                                  SHMEM_INTERNAL_HEAP_OVERHEAD;
@@ -301,19 +306,21 @@ shmem_internal_symmetric_init(void)
 int
 shmem_internal_symmetric_fini(void)
 {
+    if (!shmem_internal_heap_pre_initialized) {
 #if defined(USE_ZE)
-    ZE_CHECK(zeMemFree(shmem_internal_ze_context, shmem_internal_heap_base) );
+        ZE_CHECK(zeMemFree(shmem_internal_ze_context, shmem_internal_heap_base) );
 #elif defined(USE_CUDA)
-    CU_CHECK(cudaFree(shmem_internal_heap_base));
+        CU_CHECK(cudaFree(shmem_internal_heap_base));
 #else
-    if (NULL != shmem_internal_heap_base) {
-        if (!shmem_internal_params.SYMMETRIC_HEAP_USE_MALLOC) {
-            munmap( (void*)shmem_internal_heap_base, (size_t)shmem_internal_heap_length );
-        } else {
-            free(shmem_internal_heap_base);
+        if (NULL != shmem_internal_heap_base) {
+            if (!shmem_internal_params.SYMMETRIC_HEAP_USE_MALLOC) {
+                munmap( (void*)shmem_internal_heap_base, (size_t)shmem_internal_heap_length );
+            } else {
+                free(shmem_internal_heap_base);
+            }
         }
-    }
 #endif
+    }
     shmem_internal_heap_length = 0;
     shmem_internal_heap_base = shmem_internal_heap_curr = NULL;
     return 0;
@@ -484,4 +491,21 @@ shmem_malloc_with_hints(size_t size, long hints)
     shmem_internal_barrier_all();
 
     return ret;
+}
+
+void SHMEM_FUNCTION_ATTRIBUTES 
+shmemx_heap_preinit(void *base, size_t size) {
+
+    if (shmem_internal_initialized) {
+        RAISE_WARN_MSG("Ignoring pre-setup. Heap already initialized\n");
+        return;
+    }
+
+    shmem_internal_assert(size > 0);
+
+    shmem_internal_heap_base = base;
+    shmem_internal_heap_length = size;
+    shmem_internal_heap_curr = shmem_internal_heap_base;
+
+    shmem_internal_heap_pre_initialized = 1;
 }
