@@ -620,38 +620,48 @@ int bind_enable_ep_resources(shmem_transport_ctx_t *ctx)
 }
 
 
+#ifdef ENABLE_FI_HMEM
 static inline
-int allocate_recv_cntr_mr(void)
+int ofi_mr_regattr_bind(void)
 {
     int ret = 0;
-    uint64_t flags = 0;
 
-    /* ------------------------------------ */
-    /* POST enable resources for to EP      */
-    /* ------------------------------------ */
+    const struct iovec iov = { 
+                               .iov_base     = shmem_internal_heap_base, 
+                               .iov_len      = shmem_internal_heap_length 
+                             };
+    const struct fi_mr_attr mr_attr = {
+                                        .mr_iov         = &iov,
+                                        .iov_count      = 1,
+                                        .access         = FI_REMOTE_READ | FI_REMOTE_WRITE,
+                                        .requested_key  = 1,
+                                        .iface          = FI_HMEM_ZE,
+                                        .device.ze      = shmem_internal_my_pe /* TODO: Need to change to local */
+                                      };
 
-    /* since this is AFTER enable and RMA you must create memory regions for
-     * incoming reads/writes and outgoing non-blocking Puts, specifying entire
-     * VA range */
+     ret = fi_mr_regattr(shmem_transport_ofi_domainfd, &mr_attr, 0, &shmem_transport_ofi_target_heap_mrfd);
+     OFI_CHECK_RETURN_STR(ret, "fi_mr_regattr (heap) failed");
 
-#if ENABLE_TARGET_CNTR
-    {
-        struct fi_cntr_attr cntr_attr = {0};
+     if (shmem_transport_ofi_info.p_info->domain_attr->mr_mode & FI_MR_ENDPOINT) {
+         ret = fi_ep_bind(shmem_transport_ofi_target_ep,
+                          &shmem_transport_ofi_target_cntrfd->fid, FI_REMOTE_WRITE);
+         OFI_CHECK_RETURN_STR(ret, "target CNTR binding to target EP failed");
+         ret = fi_mr_bind(shmem_transport_ofi_target_heap_mrfd,
+                          &shmem_transport_ofi_target_ep->fid, FI_REMOTE_WRITE);
+         OFI_CHECK_RETURN_STR(ret, "target EP binding to heap MR failed");
 
-        /* Create counter for incoming writes */
-        cntr_attr.events   = FI_CNTR_EVENTS_COMP;
-        cntr_attr.wait_obj = FI_WAIT_UNSPEC;
+         ret = fi_mr_enable(shmem_transport_ofi_target_heap_mrfd);
+         OFI_CHECK_RETURN_STR(ret, "target heap MR enable failed");
+     }
 
-        ret = fi_cntr_open(shmem_transport_ofi_domainfd, &cntr_attr,
-                           &shmem_transport_ofi_target_cntrfd, NULL);
-        OFI_CHECK_RETURN_STR(ret, "target CNTR open failed");
+     return ret;
+}
+#else
 
-#ifdef ENABLE_MR_RMA_EVENT
-        if (shmem_transport_ofi_mr_rma_event)
-            flags |= FI_RMA_EVENT;
-#endif /* ENABLE_MR_RMA_EVENT */
-    }
-#endif
+static inline
+int ofi_mr_reg_bind(uint64_t flags)
+{
+    int ret = 0;
 
 #if defined(ENABLE_MR_SCALABLE) && defined(ENABLE_REMOTE_VIRTUAL_ADDRESSING)
     ret = fi_mr_reg(shmem_transport_ofi_domainfd, 0, UINT64_MAX,
@@ -736,6 +746,51 @@ int allocate_recv_cntr_mr(void)
     }
 #endif /* ENABLE_MR_RMA_EVENT */
 #endif /* ENABLE_TARGET_CNTR */
+#endif
+
+    return ret;
+}
+#endif /* ENABLE_FI_HMEM */
+
+static inline
+int allocate_recv_cntr_mr(void)
+{
+    int ret = 0;
+    uint64_t flags = 0;
+
+    /* ------------------------------------ */
+    /* POST enable resources for to EP      */
+    /* ------------------------------------ */
+
+    /* since this is AFTER enable and RMA you must create memory regions for
+     * incoming reads/writes and outgoing non-blocking Puts, specifying entire
+     * VA range */
+
+#if ENABLE_TARGET_CNTR
+    {
+        struct fi_cntr_attr cntr_attr = {0};
+
+        /* Create counter for incoming writes */
+        cntr_attr.events   = FI_CNTR_EVENTS_COMP;
+        cntr_attr.wait_obj = FI_WAIT_UNSPEC;
+
+        ret = fi_cntr_open(shmem_transport_ofi_domainfd, &cntr_attr,
+                           &shmem_transport_ofi_target_cntrfd, NULL);
+        OFI_CHECK_RETURN_STR(ret, "target CNTR open failed");
+
+#ifdef ENABLE_MR_RMA_EVENT
+        if (shmem_transport_ofi_mr_rma_event)
+            flags |= FI_RMA_EVENT;
+#endif /* ENABLE_MR_RMA_EVENT */
+    }
+#endif
+
+#ifdef ENABLE_FI_HMEM
+    ret = ofi_mr_regattr_bind();
+    OFI_CHECK_RETURN_STR(ret, "OFI MR registration with HMEM failed");
+#else
+    ret = ofi_mr_reg_bind(flags);
+    OFI_CHECK_RETURN_STR(ret, "OFI MR registration failed");
 #endif
 
     return ret;
@@ -1178,6 +1233,9 @@ int query_for_fabric(struct fabric_info *info)
                                    ordering semantics to fi_atomicmsg
                                    for put with signal implementation */
 #endif
+#ifdef ENABLE_FI_HMEM
+    hints.caps |= FI_HMEM;
+#endif
     hints.addr_format         = FI_FORMAT_UNSPEC;
 #ifdef ENABLE_FI_MANUAL_PROGRESS
     domain_attr.data_progress = FI_PROGRESS_MANUAL;
@@ -1197,6 +1255,9 @@ int query_for_fabric(struct fabric_info *info)
 #endif
 #ifdef ENABLE_MR_ENDPOINT
     domain_attr.mr_mode |= FI_MR_ENDPOINT;
+#endif
+#ifdef ENABLE_FI_HMEM
+    domain_attr.mr_mode |= FI_MR_HMEM;
 #endif
 #if !defined(ENABLE_MR_SCALABLE) || !defined(ENABLE_REMOTE_VIRTUAL_ADDRESSING)
     domain_attr.mr_key_size   = 1; /* Heap and data use different MR keys, need

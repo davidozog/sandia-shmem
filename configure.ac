@@ -267,6 +267,12 @@ AC_ARG_ENABLE([shr-atomics],
 AS_IF([test "$enable_shr_atomics" = "yes"],
       [AC_DEFINE([USE_SHR_ATOMICS], [1], [If defined, the shared memory layer will perform processor atomics.])])
 
+AC_ARG_ENABLE([ofi-hmem],
+    [AC_HELP_STRING([--enable-ofi-hmem],
+                    [Use FI_HMEM to support transfers to and from device memory. (default: disabled)])])
+AS_IF([test "$enable_ofi_hmem" = "yes"],
+      [AC_DEFINE([USE_FI_HMEM], [1], [If defined, the OFI transport will enable FI_HMEM.])])
+
 
 PKG_INSTALLDIR()
 
