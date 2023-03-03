@@ -37,7 +37,11 @@ extern int shmem_internal_initialized;
 extern int shmem_internal_finalized;
 extern int shmem_internal_thread_level;
 
-extern int shmem_internal_heap_pre_initialized;
+extern int shmem_external_heap_pre_initialized;
+extern int shmem_external_heap_device;
+
+extern void *shmem_external_heap_base;
+extern long shmem_external_heap_length;
 
 extern void *shmem_internal_heap_base;
 extern long shmem_internal_heap_length;
@@ -484,6 +488,10 @@ int shmem_internal_collectives_init(void);
 /* internal allocation, without a barrier */
 void *shmem_internal_shmalloc(size_t size);
 void* shmem_internal_get_next(intptr_t incr);
+
+#if defined(USE_ZE)
+void shmem_internal_ze_copy(void *dst, void *src, size_t size);
+#endif
 
 void dlfree(void*);
 

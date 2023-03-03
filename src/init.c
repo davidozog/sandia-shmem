@@ -59,7 +59,11 @@ long shmem_internal_heap_length = 0;
 void *shmem_internal_data_base = NULL;
 long shmem_internal_data_length = 0;
 
-int shmem_internal_heap_pre_initialized = 0;
+void *shmem_external_heap_base = NULL;
+long shmem_external_heap_length = 0;
+
+int shmem_external_heap_pre_initialized = 0;
+int shmem_external_heap_device = -1;
 
 int shmem_internal_my_pe = -1;
 int shmem_internal_num_pes = -1;
@@ -421,6 +425,8 @@ shmem_internal_heap_postinit(void)
         RETURN_ERROR_MSG("Initialization of collectives failed (%d)\n", ret);
         goto cleanup_postinit;
     }
+
+    DEBUG_MSG("Collectives init done\n");
 
     ret = shmem_internal_team_init();
     if (ret != 0) {

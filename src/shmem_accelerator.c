@@ -55,6 +55,7 @@ int shmem_internal_accelerator_init(int my_pe) {
 
     ZE_CHECK(zeDeviceGet(all_drivers[i], &device_count, NULL));
     if (device_count == 0) continue;
+    else fprintf(stderr, "Found %d devices\n", device_count);
 
     all_devices[i] = (ze_device_handle_t *) malloc(device_count * sizeof(ze_device_handle_t));
 

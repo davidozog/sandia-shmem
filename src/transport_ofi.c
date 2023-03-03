@@ -620,23 +620,26 @@ int bind_enable_ep_resources(shmem_transport_ctx_t *ctx)
 }
 
 
-#ifdef ENABLE_FI_HMEM
+#ifdef USE_FI_HMEM
 static inline
 int ofi_mr_regattr_bind(void)
 {
     int ret = 0;
+    uint64_t key = 2;
 
     const struct iovec iov = { 
-                               .iov_base     = shmem_internal_heap_base, 
-                               .iov_len      = shmem_internal_heap_length 
+                               .iov_base     = shmem_external_heap_base, 
+                               .iov_len      = shmem_external_heap_length 
                              };
     const struct fi_mr_attr mr_attr = {
                                         .mr_iov         = &iov,
                                         .iov_count      = 1,
                                         .access         = FI_REMOTE_READ | FI_REMOTE_WRITE,
-                                        .requested_key  = 1,
+                                        .requested_key  = key,
                                         .iface          = FI_HMEM_ZE,
-                                        .device.ze      = shmem_internal_my_pe /* TODO: Need to change to local */
+                                        .device.ze      = shmem_external_heap_device, /* TODO: Need to change to local */
+                                        .offset         = 0,
+                                        .context        = NULL
                                       };
 
      ret = fi_mr_regattr(shmem_transport_ofi_domainfd, &mr_attr, 0, &shmem_transport_ofi_target_heap_mrfd);
@@ -656,7 +659,7 @@ int ofi_mr_regattr_bind(void)
 
      return ret;
 }
-#else
+#endif /* USE_FI_HMEM */
 
 static inline
 int ofi_mr_reg_bind(uint64_t flags)
@@ -750,7 +753,6 @@ int ofi_mr_reg_bind(uint64_t flags)
 
     return ret;
 }
-#endif /* ENABLE_FI_HMEM */
 
 static inline
 int allocate_recv_cntr_mr(void)
@@ -785,13 +787,12 @@ int allocate_recv_cntr_mr(void)
     }
 #endif
 
-#ifdef ENABLE_FI_HMEM
+#ifdef USE_FI_HMEM
     ret = ofi_mr_regattr_bind();
     OFI_CHECK_RETURN_STR(ret, "OFI MR registration with HMEM failed");
-#else
+#endif
     ret = ofi_mr_reg_bind(flags);
     OFI_CHECK_RETURN_STR(ret, "OFI MR registration failed");
-#endif
 
     return ret;
 }
@@ -1233,7 +1234,7 @@ int query_for_fabric(struct fabric_info *info)
                                    ordering semantics to fi_atomicmsg
                                    for put with signal implementation */
 #endif
-#ifdef ENABLE_FI_HMEM
+#ifdef USE_FI_HMEM
     hints.caps |= FI_HMEM;
 #endif
     hints.addr_format         = FI_FORMAT_UNSPEC;
@@ -1256,7 +1257,7 @@ int query_for_fabric(struct fabric_info *info)
 #ifdef ENABLE_MR_ENDPOINT
     domain_attr.mr_mode |= FI_MR_ENDPOINT;
 #endif
-#ifdef ENABLE_FI_HMEM
+#ifdef USE_FI_HMEM
     domain_attr.mr_mode |= FI_MR_HMEM;
 #endif
 #if !defined(ENABLE_MR_SCALABLE) || !defined(ENABLE_REMOTE_VIRTUAL_ADDRESSING)
