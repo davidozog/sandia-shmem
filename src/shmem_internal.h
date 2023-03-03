@@ -489,10 +489,6 @@ int shmem_internal_collectives_init(void);
 void *shmem_internal_shmalloc(size_t size);
 void* shmem_internal_get_next(intptr_t incr);
 
-#if defined(USE_ZE)
-void shmem_internal_ze_copy(void *dst, void *src, size_t size);
-#endif
-
 void dlfree(void*);
 
 static inline void shmem_internal_free(void *ptr)
