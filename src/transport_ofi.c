@@ -81,6 +81,13 @@ uint8_t**                       shmem_transport_ofi_target_heap_addrs;
 uint8_t**                       shmem_transport_ofi_target_data_addrs;
 #endif /* ENABLE_REMOTE_VIRTUAL_ADDRESSING */
 #endif /* ENABLE_MR_SCALABLE */
+
+#ifdef USE_FI_HMEM
+struct fid_mr*                  shmem_transport_ofi_external_heap_mrfd;
+uint64_t*                       shmem_transport_ofi_external_heap_keys;
+uint8_t**                       shmem_transport_ofi_external_heap_addrs;
+#endif
+
 uint64_t                        shmem_transport_ofi_max_poll;
 long                            shmem_transport_ofi_put_poll_limit;
 long                            shmem_transport_ofi_get_poll_limit;
@@ -642,18 +649,25 @@ int ofi_mr_regattr_bind(void)
                                         .context        = NULL
                                       };
 
-     ret = fi_mr_regattr(shmem_transport_ofi_domainfd, &mr_attr, 0, &shmem_transport_ofi_target_heap_mrfd);
+     ret = fi_mr_regattr(shmem_transport_ofi_domainfd, &mr_attr, 0, &shmem_transport_ofi_external_heap_mrfd);
      OFI_CHECK_RETURN_STR(ret, "fi_mr_regattr (heap) failed");
+
+#if ENABLE_TARGET_CNTR
+    ret = fi_mr_bind(shmem_transport_ofi_external_heap_mrfd,
+                     &shmem_transport_ofi_target_cntrfd->fid,
+                     FI_REMOTE_WRITE);
+    OFI_CHECK_RETURN_STR(ret, "target CNTR binding to external heap MR failed");
+#endif
 
      if (shmem_transport_ofi_info.p_info->domain_attr->mr_mode & FI_MR_ENDPOINT) {
          ret = fi_ep_bind(shmem_transport_ofi_target_ep,
                           &shmem_transport_ofi_target_cntrfd->fid, FI_REMOTE_WRITE);
          OFI_CHECK_RETURN_STR(ret, "target CNTR binding to target EP failed");
-         ret = fi_mr_bind(shmem_transport_ofi_target_heap_mrfd,
+         ret = fi_mr_bind(shmem_transport_ofi_external_heap_mrfd,
                           &shmem_transport_ofi_target_ep->fid, FI_REMOTE_WRITE);
          OFI_CHECK_RETURN_STR(ret, "target EP binding to heap MR failed");
 
-         ret = fi_mr_enable(shmem_transport_ofi_target_heap_mrfd);
+         ret = fi_mr_enable(shmem_transport_ofi_external_heap_mrfd);
          OFI_CHECK_RETURN_STR(ret, "target heap MR enable failed");
      }
 
@@ -797,6 +811,43 @@ int allocate_recv_cntr_mr(void)
     return ret;
 }
 
+#ifdef USE_FI_HMEM
+static
+int publish_external_mr_info(void)
+{
+    int err;
+    uint64_t ext_heap_key;
+
+    if (shmem_transport_ofi_info.p_info->domain_attr->mr_mode & FI_MR_PROV_KEY) {
+        ext_heap_key = fi_mr_key(shmem_transport_ofi_external_heap_mrfd);
+    } else {
+        ext_heap_key = 2;
+    }
+
+    err = shmem_runtime_put("fi_ext_heap_key", &ext_heap_key, sizeof(uint64_t));
+    if (err) {
+        RAISE_WARN_STR("Put of heap key to runtime KVS failed");
+        return 1;
+    }
+
+    void *ext_heap_base;
+
+    if (shmem_transport_ofi_info.p_info->domain_attr->mr_mode & FI_MR_VIRT_ADDR) {
+        ext_heap_base = shmem_external_heap_base;
+    } else {
+        ext_heap_base = (void *) 0;
+    }
+
+    err = shmem_runtime_put("fi_ext_heap_addr", &ext_heap_base, sizeof(uint8_t*));
+    if (err) {
+        RAISE_WARN_STR("Put of heap address to runtime KVS failed");
+        return 1;
+    }
+
+    return 0;
+}
+#endif
+
 static
 int publish_mr_info(void)
 {
@@ -859,8 +910,61 @@ int publish_mr_info(void)
 #endif /* ENABLE_REMOTE_VIRTUAL_ADDRESSING */
 #endif /* !ENABLE_MR_SCALABLE */
 
+#ifdef USE_FI_HMEM
+    int err = publish_external_mr_info();
+    if (err) {
+        RAISE_WARN_STR("Publish of external mr info failed");
+        return 1;
+    }
+#endif
+
     return 0;
 }
+
+
+#ifdef USE_FI_HMEM
+static
+int populate_external_mr_tables(void)
+{
+    int i, err;
+
+    shmem_transport_ofi_external_heap_keys = malloc(sizeof(uint64_t) * shmem_internal_num_pes);
+    if (NULL == shmem_transport_ofi_external_heap_keys) {
+        RAISE_WARN_STR("Out of memory allocating heap keytable");
+        return 1;
+    }
+
+    /* Called after the upper layer performs the runtime exchange */
+    for (i = 0; i < shmem_internal_num_pes; i++) {
+        err = shmem_runtime_get(i, "fi_ext_heap_key",
+                                &shmem_transport_ofi_external_heap_keys[i],
+                                sizeof(uint64_t));
+        if (err) {
+            RAISE_WARN_STR("Get of heap key from runtime KVS failed");
+            return 1;
+        }
+    }
+
+    shmem_transport_ofi_external_heap_addrs = malloc(sizeof(uint8_t*) * shmem_internal_num_pes);
+    if (NULL == shmem_transport_ofi_external_heap_addrs) {
+        RAISE_WARN_STR("Out of memory allocating heap addrtable");
+        return 1;
+    }
+
+    /* Called after the upper layer performs the runtime exchange */
+    for (i = 0; i < shmem_internal_num_pes; i++) {
+        err = shmem_runtime_get(i, "fi_ext_heap_addr",
+                                &shmem_transport_ofi_external_heap_addrs[i],
+                                sizeof(uint8_t*));
+        if (err) {
+            RAISE_WARN_STR("Get of heap address from runtime KVS failed");
+            return 1;
+        }
+    }
+
+    return 0;
+}
+#endif
 
 static
 int populate_mr_tables(void)
@@ -936,6 +1040,14 @@ int populate_mr_tables(void)
     }
 #endif /* ENABLE_REMOTE_VIRTUAL_ADDRESSING */
 #endif /* !ENABLE_MR_SCALABLE */
+
+#ifdef USE_FI_HMEM
+    int err = populate_external_mr_tables();
+    if (err) {
+        RAISE_WARN_STR("Populate external MR tables failed");
+        return 1;
+    }
+#endif
 
     return 0;
 }
@@ -1884,6 +1996,11 @@ int shmem_transport_fini(void)
 
     ret = fi_close(&shmem_transport_ofi_target_data_mrfd->fid);
     OFI_CHECK_ERROR_MSG(ret, "Target data MR close failed (%s)\n", fi_strerror(errno));
+#endif
+
+#ifdef USE_FI_HMEM
+    ret = fi_close(&shmem_transport_ofi_external_heap_mrfd->fid);
+    OFI_CHECK_ERROR_MSG(ret, "External heap MR close failed (%s)\n", fi_strerror(errno));
 #endif
 
     ret = fi_close(&shmem_transport_ofi_target_ep->fid);
