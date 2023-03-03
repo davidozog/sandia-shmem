@@ -426,8 +426,6 @@ shmem_internal_heap_postinit(void)
         goto cleanup_postinit;
     }
 
-    DEBUG_MSG("Collectives init done\n");
-
     ret = shmem_internal_team_init();
     if (ret != 0) {
         RETURN_ERROR_MSG("Initialization of teams failed (%d)\n", ret);
