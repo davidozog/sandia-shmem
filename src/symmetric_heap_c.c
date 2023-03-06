@@ -501,6 +501,11 @@ shmemx_heap_preinit(void *base, size_t size, int device_index) {
         return;
     }
 
+#if defined(USE_ZE) || defined(USE_CUDA)
+    RAISE_WARN_MSG("Currently, no support for device heaps and external device heap");
+    return;
+#endif
+
     shmem_internal_assert(size > 0);
 #ifndef USE_FI_HMEM
     shmem_internal_assert(device_index == -1);
