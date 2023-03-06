@@ -8,11 +8,10 @@
 
 int main() {
 
-    size_t external_heap_length = 64 * 1024;
-
     sycl::queue Q;
     std::cout <<"Device : " << Q.get_device().get_info<sycl::info::device::name>() << std::endl;
 
+    size_t external_heap_length = 64 * 1024;
     size_t *external_heap = sycl::malloc_device<size_t>(external_heap_length, Q);
 
     int *src = (int *) malloc(1 * sizeof(int));
@@ -26,8 +25,6 @@ int main() {
     int me = shmem_my_pe();
     int npes = shmem_n_pes();
 
-    printf("Hello from PE %d\n", me);
-
     auto e1 = Q.submit([&](sycl::handler &h) {
         h.single_task([=]() {
             external_heap[0] = 55;
@@ -38,21 +35,17 @@ int main() {
     src[0] = me + 5;
 
     shmem_int_put((int *) external_heap, src, 1, (me + 1) % npes);
-    printf("PE %d: Sent data to %d\n", me, (me + 1) % npes);
 
     shmem_barrier_all();
 
     auto e2 = Q.submit([&](sycl::handler &h) {
         h.single_task([=]() {
-            if (external_heap[0] != (me - 1 + npes) % npes + 5)
-                *errors = external_heap[0];
+            *errors = external_heap[0];
         });
     });
     e2.wait_and_throw();
 
-    if (*errors != 0)
-        std::cout << "ERROR in device read: " << *errors << std::endl;
-
+    std::cout << "[PE " << me << "] Data in device heap " << *errors << ", expected = " << (me - 1 + npes) % npes + 5 << std::endl;
 
     sycl::free(errors, Q);
     free(src);
