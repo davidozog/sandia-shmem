@@ -345,7 +345,7 @@ shmem_internal_heap_postinit(void)
     ret = shmem_internal_symmetric_init();
     if (0 != ret) {
         RETURN_ERROR_MSG("Symmetric heap initialization failed (%d)\n", ret);
-        goto cleanup;
+        goto cleanup_postinit;
     }
 
     DEBUG_MSG("Thread level=%s, Num. PEs=%d\n"
