@@ -671,7 +671,7 @@ int ofi_mr_regattr_bind(void)
     }
 #endif
 
-     return ret;
+    return ret;
 }
 #endif /* USE_FI_HMEM */
 
