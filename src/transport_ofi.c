@@ -649,27 +649,27 @@ int ofi_mr_regattr_bind(void)
                                         .context        = NULL
                                       };
 
-     ret = fi_mr_regattr(shmem_transport_ofi_domainfd, &mr_attr, 0, &shmem_transport_ofi_external_heap_mrfd);
-     OFI_CHECK_RETURN_STR(ret, "fi_mr_regattr (heap) failed");
+    ret = fi_mr_regattr(shmem_transport_ofi_domainfd, &mr_attr, 0, &shmem_transport_ofi_external_heap_mrfd);
+    OFI_CHECK_RETURN_STR(ret, "fi_mr_regattr (heap) failed");
 
 #if ENABLE_TARGET_CNTR
     ret = fi_mr_bind(shmem_transport_ofi_external_heap_mrfd,
                      &shmem_transport_ofi_target_cntrfd->fid,
                      FI_REMOTE_WRITE);
     OFI_CHECK_RETURN_STR(ret, "target CNTR binding to external heap MR failed");
+
+    if (shmem_transport_ofi_info.p_info->domain_attr->mr_mode & FI_MR_ENDPOINT) {
+        ret = fi_ep_bind(shmem_transport_ofi_target_ep,
+                         &shmem_transport_ofi_target_cntrfd->fid, FI_REMOTE_WRITE);
+        OFI_CHECK_RETURN_STR(ret, "target CNTR binding to target EP failed");
+        ret = fi_mr_bind(shmem_transport_ofi_external_heap_mrfd,
+                         &shmem_transport_ofi_target_ep->fid, FI_REMOTE_WRITE);
+        OFI_CHECK_RETURN_STR(ret, "target EP binding to heap MR failed");
+
+        ret = fi_mr_enable(shmem_transport_ofi_external_heap_mrfd);
+        OFI_CHECK_RETURN_STR(ret, "target heap MR enable failed");
+    }
 #endif
-
-     if (shmem_transport_ofi_info.p_info->domain_attr->mr_mode & FI_MR_ENDPOINT) {
-         ret = fi_ep_bind(shmem_transport_ofi_target_ep,
-                          &shmem_transport_ofi_target_cntrfd->fid, FI_REMOTE_WRITE);
-         OFI_CHECK_RETURN_STR(ret, "target CNTR binding to target EP failed");
-         ret = fi_mr_bind(shmem_transport_ofi_external_heap_mrfd,
-                          &shmem_transport_ofi_target_ep->fid, FI_REMOTE_WRITE);
-         OFI_CHECK_RETURN_STR(ret, "target EP binding to heap MR failed");
-
-         ret = fi_mr_enable(shmem_transport_ofi_external_heap_mrfd);
-         OFI_CHECK_RETURN_STR(ret, "target heap MR enable failed");
-     }
 
      return ret;
 }
