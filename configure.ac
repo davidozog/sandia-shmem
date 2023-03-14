@@ -13,7 +13,7 @@
 
 dnl Init Autoconf/Automake/Libtool
 
-AC_INIT([Sandia OpenSHMEM], [1.5.1], [https://github.com/Sandia-OpenSHMEM/SOS/issues], [sandia-openshmem], [https://github.com/Sandia-OpenSHMEM/SOS])
+AC_INIT([Sandia OpenSHMEM], [1.5.2rc1], [https://github.com/Sandia-OpenSHMEM/SOS/issues], [sandia-openshmem], [https://github.com/Sandia-OpenSHMEM/SOS])
 AC_PREREQ([2.60])
 AC_CONFIG_AUX_DIR([config])
 AC_CONFIG_MACRO_DIR([config])
@@ -59,6 +59,11 @@ AC_ARG_ENABLE([error-checking],
                     [Enable error checking for SHMEM calls (default:disabled)])])
 AS_IF([test "$enable_error_checking" = "yes"], [AC_DEFINE([ENABLE_ERROR_CHECKING], [1], [Enable argument checking])])
 AM_CONDITIONAL([ENABLE_ERROR_CHECKING], [test "$enable_error_checking" = "yes"])
+
+AC_ARG_ENABLE([deprecated-tests],
+    [AC_HELP_STRING([--enable-deprecated-tests],
+                    [Enable deprecated SHMEM API calls in tests (default:disabled)])])
+AM_CONDITIONAL([ENABLE_DEPRECATED_TESTS], [test "$enable_deprecated_tests" = "yes"])
 
 AC_ARG_ENABLE([hard-polling],
     [AC_HELP_STRING([--enable-hard-polling],
