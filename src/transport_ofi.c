@@ -657,7 +657,6 @@ int ofi_mr_regattr_bind(void)
                      &shmem_transport_ofi_target_cntrfd->fid,
                      FI_REMOTE_WRITE);
     OFI_CHECK_RETURN_STR(ret, "target CNTR binding to external heap MR failed");
-#endif
 
      if (shmem_transport_ofi_info.p_info->domain_attr->mr_mode & FI_MR_ENDPOINT) {
          ret = fi_ep_bind(shmem_transport_ofi_target_ep,
@@ -670,6 +669,7 @@ int ofi_mr_regattr_bind(void)
          ret = fi_mr_enable(shmem_transport_ofi_external_heap_mrfd);
          OFI_CHECK_RETURN_STR(ret, "target heap MR enable failed");
      }
+#endif
 
      return ret;
 }
