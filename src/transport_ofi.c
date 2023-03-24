@@ -1,6 +1,9 @@
 /* -*- C -*-
  *
- * Copyright (c) 2017 Intel Corporation. All rights reserved.
+ * Copyright (c) 2022 Intel Corporation. All rights reserved.
+ *
+ * Copyright (c) 2022 Cornelis Networks, Inc. All rights reserved.
+ *
  * This software is available to you under the BSD license.
  *
  * This file is part of the Sandia OpenSHMEM software package. For license
@@ -1495,6 +1498,8 @@ static int shmem_transport_ofi_target_ep_init(void)
     info->p_info->mode = 0;
     info->p_info->tx_attr->mode = 0;
     info->p_info->rx_attr->mode = 0;
+    info->p_info->tx_attr->caps = FI_RMA | FI_ATOMIC;
+    info->p_info->rx_attr->caps = info->p_info->caps;
 
     ret = fi_endpoint(shmem_transport_ofi_domainfd,
                       info->p_info, &shmem_transport_ofi_target_ep, NULL);
@@ -1558,6 +1563,8 @@ static int shmem_transport_ofi_ctx_init(shmem_transport_ctx_t *ctx, int id)
     info->p_info->mode = 0;
     info->p_info->tx_attr->mode = 0;
     info->p_info->rx_attr->mode = 0;
+    info->p_info->tx_attr->caps = info->p_info->caps;
+    info->p_info->rx_attr->caps = FI_RECV; /* to drive progress on the CQ */;
 
     ctx->id = id;
 #ifdef USE_CTX_LOCK
@@ -1676,10 +1683,10 @@ int shmem_transport_init(void)
 
 
     /* The current bounce buffering implementation is only compatible with
-     * providers that don't require FI_CONTEXT */
-    if (shmem_transport_ofi_info.p_info->mode & FI_CONTEXT) {
+     * providers that don't require FI_CONTEXT or FI_CONTEXT2 */
+    if (shmem_transport_ofi_info.p_info->mode & FI_CONTEXT || shmem_transport_ofi_info.p_info->mode & FI_CONTEXT2) {
         if (shmem_internal_my_pe == 0 && shmem_internal_params.BOUNCE_SIZE > 0) {
-            DEBUG_STR("OFI provider requires FI_CONTEXT; disabling bounce buffering");
+            DEBUG_STR("OFI provider requires FI_CONTEXT and or FI_CONTEXT2; disabling bounce buffering");
         }
         shmem_transport_ofi_bounce_buffer_size = 0;
         shmem_transport_ofi_max_bounce_buffers = 0;
