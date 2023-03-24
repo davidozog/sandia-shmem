@@ -4,7 +4,6 @@
 #include <stdlib.h>
 
 #include <CL/sycl.hpp>
-#include"level_zero/ze_api.h"
 
 int main() {
     int ret = 0;
@@ -20,7 +19,7 @@ int main() {
 
     *errors = 0;
 
-    shmemx_heap_preinit(external_heap, external_heap_length, 0);
+    shmemx_heap_preinit(external_heap, external_heap_length, SHMEMX_EXTERNAL_HEAP_ZE, 0);
     shmem_init();
 
     int me = shmem_my_pe();

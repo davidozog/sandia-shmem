@@ -85,6 +85,7 @@ void *shmem_external_heap_base = NULL;
 long shmem_external_heap_length = 0;
 
 int shmem_external_heap_pre_initialized = 0;
+int shmem_external_heap_device_type = -1;
 int shmem_external_heap_device = -1;
 
 int shmem_internal_my_pe = -1;

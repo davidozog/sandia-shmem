@@ -41,6 +41,7 @@ extern void *shmem_external_heap_base;
 extern long shmem_external_heap_length;
 
 extern int shmem_external_heap_pre_initialized;
+extern int shmem_external_heap_device_type;
 extern int shmem_external_heap_device;
 
 extern void *shmem_internal_heap_base;

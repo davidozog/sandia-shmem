@@ -495,7 +495,7 @@ shmem_malloc_with_hints(size_t size, long hints)
 }
 
 void SHMEM_FUNCTION_ATTRIBUTES 
-shmemx_heap_preinit(void *base, size_t size, int device_index) {
+shmemx_heap_preinit(void *base, size_t size, int device_type, int device_index) {
 
     if (shmem_internal_initialized) {
         RAISE_WARN_MSG("Ignoring pre-setup. Heap already initialized\n");
@@ -503,7 +503,7 @@ shmemx_heap_preinit(void *base, size_t size, int device_index) {
     }
 
 #if defined(USE_ZE) || defined(USE_CUDA)
-    RAISE_WARN_MSG("Currently, no support for device heaps and external device heap");
+    RAISE_WARN_MSG("Currently, no support for multiple heaps from device");
     return;
 #endif
 
@@ -516,6 +516,11 @@ shmemx_heap_preinit(void *base, size_t size, int device_index) {
 
     shmem_external_heap_base         = base;
     shmem_external_heap_length       = size;
+
+    shmem_internal_assert(device_type == SHMEMX_EXTERNAL_HEAP_ZE ||
+                          device_type == SHMEMX_EXTERNAL_HEAP_CUDA);
+
+    shmem_external_heap_device_type  = device_type;
     shmem_external_heap_device       = device_index;
 
     shmem_external_heap_pre_initialized = 1;

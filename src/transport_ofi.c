@@ -646,7 +646,13 @@ int ofi_mr_regattr_bind(void)
                                         .iov_count      = 1,
                                         .access         = FI_REMOTE_READ | FI_REMOTE_WRITE,
                                         .requested_key  = key,
+#if defined(USE_ZE)
                                         .iface          = FI_HMEM_ZE,
+#elif defined(USE_CUDA)
+                                        .iface          = FI_HMEM_CUDA,
+#else
+                                        .iface          = (shmem_external_heap_device_type == SHMEMX_EXTERNAL_HEAP_ZE ? FI_HMEM_ZE : FI_HMEM_CUDA),
+#endif
                                         .device.ze      = shmem_external_heap_device, /* TODO: Need to change to local */
                                         .offset         = 0,
                                         .context        = NULL
