@@ -156,6 +156,15 @@ void shmem_transport_ofi_get_mr(const void *addr, int dest_pe,
 static inline
 void shmem_transport_ofi_get_mr(const void *addr, int dest_pe,
                                 uint8_t **mr_addr, uint64_t *key) {
+    /* First check with external heap as for GDR, this is the most used case */
+#ifdef USE_FI_HMEM
+    if ((void*) addr >= shmem_external_heap_base &&
+             (uint8_t*) addr < (uint8_t*) shmem_external_heap_base + shmem_external_heap_length) {
+        *key = shmem_transport_ofi_external_heap_keys[dest_pe];
+        *mr_addr = shmem_transport_ofi_external_heap_addrs[dest_pe] +
+            ((uint8_t *) addr - (uint8_t *) shmem_external_heap_base);
+    } else
+#endif /* USE_FI_HMEM */
     if ((void*) addr >= shmem_internal_data_base &&
         (uint8_t*) addr < (uint8_t*) shmem_internal_data_base + shmem_internal_data_length) {
         *key = shmem_transport_ofi_target_data_keys[dest_pe];
@@ -183,14 +192,6 @@ void shmem_transport_ofi_get_mr(const void *addr, int dest_pe,
             ((uint8_t *) addr - (uint8_t *) shmem_internal_heap_base);
 #endif
     }
-#ifdef USE_FI_HMEM
-    else if ((void*) addr >= shmem_external_heap_base &&
-             (uint8_t*) addr < (uint8_t*) shmem_external_heap_base + shmem_external_heap_length) {
-        *key = shmem_transport_ofi_external_heap_keys[dest_pe];
-        *mr_addr = shmem_transport_ofi_external_heap_addrs[dest_pe] +
-            ((uint8_t *) addr - (uint8_t *) shmem_external_heap_base);
-    }
-#endif /* USE_FI_HMEM */
     else {
         *key = -1;
         *mr_addr = NULL;

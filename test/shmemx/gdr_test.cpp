@@ -7,6 +7,7 @@
 #include"level_zero/ze_api.h"
 
 int main() {
+    int ret = 0;
 
     sycl::queue Q;
     std::cout <<"Device : " << Q.get_device().get_info<sycl::info::device::name>() << std::endl;
@@ -45,12 +46,28 @@ int main() {
     });
     e2.wait_and_throw();
 
-    std::cout << "[PE " << me << "] Data in device heap " << *errors << ", expected = " << (me - 1 + npes) % npes + 5 << std::endl;
+    if (*errors != (me - 1 + npes) % npes + 5) {
+        std::cout << "ERROR: [PE " << me << "] Data in device heap " << *errors << ", expected = " << (me - 1 + npes) % npes + 5 << std::endl;
+        ret = 1;
+    } else {
+        std::cout << "[PE " << me << "] GDR put test successful" << std::endl;
+    }
+
+    int local = -1;
+    shmem_int_get(&local, (int *) external_heap, 1, (me - 1 + npes) % npes);
+    shmem_barrier_all();
+
+    if (local != (me - 2 + npes) % npes + 5) {
+        std::cout << "ERROR: [PE " << me << "] Data received " << local << ", expected = " << (me - 2 + npes) % npes + 5 << std::endl;
+        ret = 1;
+    } else {
+        std::cout << "[PE " << me << "] GDR get test successful" << std::endl;
+    }
 
     sycl::free(errors, Q);
     free(src);
     sycl::free(external_heap, Q);
     shmem_finalize(); 
 
-    return 0;
+    return ret;
 }
