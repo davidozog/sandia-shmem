@@ -28,6 +28,9 @@ typedef struct {
     extern shmem_team_t SHMEMX_TEAM_HOST;
 #endif
 
+#define SHMEMX_EXTERNAL_HEAP_ZE 0
+#define SHMEMX_EXTERNAL_HEAP_CUDA 1
+
 #ifdef __cplusplus
 }
 #endif

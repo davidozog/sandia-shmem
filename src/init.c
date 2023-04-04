@@ -81,7 +81,12 @@ long shmem_internal_heap_length = 0;
 void *shmem_internal_data_base = NULL;
 long shmem_internal_data_length = 0;
 
-int shmem_internal_heap_pre_initialized = 0;
+void *shmem_external_heap_base = NULL;
+long shmem_external_heap_length = 0;
+
+int shmem_external_heap_pre_initialized = 0;
+int shmem_external_heap_device_type = -1;
+int shmem_external_heap_device = -1;
 
 int shmem_internal_my_pe = -1;
 int shmem_internal_num_pes = -1;
@@ -367,6 +372,22 @@ shmem_internal_heap_postinit(void)
     int teams_initialized     = 0;
     int enable_node_ranks     = 0;
 
+    /* create symmetric heap */
+    ret = shmem_internal_symmetric_init();
+    if (0 != ret) {
+        RETURN_ERROR_MSG("Symmetric heap initialization failed (%d)\n", ret);
+        goto cleanup_postinit;
+    }
+
+    DEBUG_MSG("Thread level=%s, Num. PEs=%d\n"
+              RAISE_PE_PREFIX
+              "Sym. heap=%p len=%ld -- data=%p len=%ld\n",
+              shmem_internal_thread_level_str[shmem_internal_thread_level],
+              shmem_internal_num_pes,
+              shmem_internal_my_pe,
+              shmem_internal_heap_base, shmem_internal_heap_length,
+              shmem_internal_data_base, shmem_internal_data_length);
+
 #ifdef HAVE_SCHED_GETAFFINITY
     if (shmem_internal_params.DEBUG) {
         cpu_set_t my_set;
@@ -502,32 +523,12 @@ shmem_internal_init(int tl_requested, int *tl_provided)
     ret = shmem_internal_runtime_init(tl_requested, tl_provided);
     if (ret) goto cleanup;
 
-    /* create symmetric heap */
-    ret = shmem_internal_symmetric_init();
-    if (0 != ret) {
-        RETURN_ERROR_MSG("Symmetric heap initialization failed (%d)\n", ret);
-        goto cleanup;
-    }
-
-    DEBUG_MSG("Thread level=%s, Num. PEs=%d\n"
-              RAISE_PE_PREFIX
-              "Sym. heap=%p len=%ld -- data=%p len=%ld\n",
-              shmem_internal_thread_level_str[shmem_internal_thread_level],
-              shmem_internal_num_pes,
-              shmem_internal_my_pe,
-              shmem_internal_heap_base, shmem_internal_heap_length,
-              shmem_internal_data_base, shmem_internal_data_length);
-
     ret = shmem_internal_heap_postinit();
     if (ret) goto cleanup;
 
     return 0;
 
  cleanup:
-    if (NULL != shmem_internal_data_base) {
-        shmem_internal_symmetric_fini();
-    }
-
     abort();
 }
 
