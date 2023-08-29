@@ -1336,6 +1336,37 @@ int allocate_fabric_resources(struct fabric_info *info)
     return ret;
 }
 
+static int compare_nic_names(const void *f1, const void *f2)
+{
+    const struct fi_info **fabric1 = (const struct fi_info **) f1;
+    const struct fi_info **fabric2 = (const struct fi_info **) f2;
+    return strcmp((*fabric1)->nic->device_attr->name, (*fabric2)->nic->device_attr->name);
+}
+
+bool nic_already_used(struct fid_nic *nic, struct fi_info *fabrics, int num_nics)
+{
+    struct fi_info *cur_fabric = fabrics;
+    for (int i = 0; i < num_nics; i++) {
+        if (nic->bus_attr->bus_type == FI_BUS_PCI &&
+            cur_fabric->nic->bus_attr->bus_type == FI_BUS_PCI) {
+            struct fi_pci_attr nic_pci = nic->bus_attr->attr.pci;
+            struct fi_pci_attr cur_fabric_pci = cur_fabric->nic->bus_attr->attr.pci;
+            if (nic_pci.domain_id == cur_fabric_pci.domain_id && nic_pci.bus_id == cur_fabric_pci.bus_id &&
+                nic_pci.device_id == cur_fabric_pci.device_id && nic_pci.function_id == cur_fabric_pci.function_id) {
+                return true;
+            }
+        } else {
+            if (strcmp(nic->device_attr->name, cur_fabric->nic->device_attr->name) == 0) {
+                return true;
+            }
+        }
+
+        cur_fabric = cur_fabric->next;
+    }
+
+    return false;
+}
+
 static inline
 int query_for_fabric(struct fabric_info *info)
 {
@@ -1424,24 +1455,77 @@ int query_for_fabric(struct fabric_info *info)
 
     /* If the user supplied a fabric or domain name, use it to select the
      * fabric.  Otherwise, select the first fabric in the list. */
-    if (info->fabric_name != NULL || info->domain_name != NULL) {
-        struct fi_info *cur_fabric;
 
-        info->p_info = NULL;
+    // NOTE: Just for testing...make value derived from env. variable.
+    const int SHMEM_USE_MULTIRAIL = 1;
+    if (SHMEM_USE_MULTIRAIL) {
+        int num_nics = 0;
+        struct fi_info *fallback = NULL;
+        struct fi_info *multirail_fabric_list_head = NULL;
+        struct fi_info *multirail_last_added = NULL;
 
-        for (cur_fabric = info->fabrics; cur_fabric; cur_fabric = cur_fabric->next) {
-            if (info->fabric_name == NULL ||
-                fnmatch(info->fabric_name, cur_fabric->fabric_attr->name, 0) == 0) {
-                if (info->domain_name == NULL ||
-                    fnmatch(info->domain_name, cur_fabric->domain_attr->name, 0) == 0) {
-                    info->p_info = cur_fabric;
-                    break;
+        if (info->fabric_name != NULL || info->domain_name != NULL) {
+            struct fi_info *cur_fabric;
+
+            info->p_info = NULL;
+
+            for (cur_fabric = info->fabrics; cur_fabric; cur_fabric = cur_fabric->next) {
+                if (info->fabric_name == NULL ||
+                    fnmatch(info->fabric_name, cur_fabric->fabric_attr->name, 0) == 0) {
+                    if (info->domain_name == NULL ||
+                        fnmatch(info->domain_name, cur_fabric->domain_attr->name, 0) == 0) {
+                        if (!fallback) fallback = cur_fabric;
+                        if (cur_fabric->nic && !nic_already_used(cur_fabric->nic, multirail_fabric_list_head, num_nics)) {
+                            num_nics += 1;
+                            if (!multirail_fabric_list_head) multirail_fabric_list_head = cur_fabric;
+                            if (multirail_last_added) multirail_last_added->next = cur_fabric;
+                            multirail_last_added = cur_fabric;
+                        }
+                    }
+                }
+            }
+
+            if (num_nics == 0) {
+                info->p_info = fallback;
+            }
+            else {
+                int idx = 0;
+                struct fi_info **prov_list = (struct fi_info **) malloc(num_nics * sizeof(struct fi_info *));
+                for (cur_fabric = multirail_fabric_list_head; cur_fabric; cur_fabric = cur_fabric->next) {
+                    prov_list[idx++] = cur_fabric;
+                }
+                qsort(prov_list, num_nics, sizeof(struct fi_info *), compare_nic_names);
+                info->p_info = prov_list[shmem_internal_my_pe % num_nics];
+                //Correct to this once SHMEM_TEAM_SHARED/SHMEMX_TEAM_HOST fixed:
+                //info->p_info = prov_list[shmem_team_translate_pe(SHMEM_TEAM_WORLD, shmem_internal_my_pe, SHMEMX_TEAM_HOST) % num_nics];
+            }
+        }
+        else {
+            // NOTE: Change to search for first fabric with NIC info?
+            info->p_info = info->fabrics;
+        }
+        DEBUG_MSG("Number of unique NICs detected: %d\n", num_nics);
+    }
+    else {
+        if (info->fabric_name != NULL || info->domain_name != NULL) {
+            struct fi_info *cur_fabric;
+
+            info->p_info = NULL;
+
+            for (cur_fabric = info->fabrics; cur_fabric; cur_fabric = cur_fabric->next) {
+                if (info->fabric_name == NULL ||
+                    fnmatch(info->fabric_name, cur_fabric->fabric_attr->name, 0) == 0) {
+                    if (info->domain_name == NULL ||
+                        fnmatch(info->domain_name, cur_fabric->domain_attr->name, 0) == 0) {
+                        info->p_info = cur_fabric;
+                        break;
+                    }
                 }
             }
         }
-    }
-    else {
-        info->p_info = info->fabrics;
+        else {
+            info->p_info = info->fabrics;
+        }
     }
 
     if (NULL == info->p_info) {
