@@ -2880,7 +2880,7 @@ static size_t traverse_and_check(mstate m);
   else if (X > 0xFFFF)\
     I = NTREEBINS-1;\
   else {\
-    unsigned int K = (unsigned) sizeof(X)*__CHAR_BIT__ - 1 - (unsigned) __builtin_clz(X); \
+    unsigned int K = (unsigned int) sizeof(X)*__CHAR_BIT__ - 1 - (unsigned int) __builtin_clz(X); \
     I =  (bindex_t)((K << 1) + ((S >> (K + (TREEBIN_SHIFT-1)) & 1)));\
   }\
 }
