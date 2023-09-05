@@ -234,7 +234,7 @@ shmem_runtime_exchange(void)
 int
 shmem_runtime_put(char *key, void *value, size_t valuelen)
 {
-    snprintf(kvs_key, max_key_len, "shmem-%lu-%s", (long unsigned) rank, key);
+    snprintf(kvs_key, max_key_len, "shmem-%lu-%s", (unsigned long) rank, key);
     if (0 != shmem_runtime_util_encode(value, valuelen, kvs_value,
                                        max_val_len)) {
         return 1;
@@ -261,7 +261,7 @@ shmem_runtime_put(char *key, void *value, size_t valuelen)
 int
 shmem_runtime_get(int pe, char *key, void *value, size_t valuelen)
 {
-    snprintf(kvs_key, max_key_len, "shmem-%lu-%s", (long unsigned) pe, key);
+    snprintf(kvs_key, max_key_len, "shmem-%lu-%s", (unsigned long) pe, key);
     if (size == 1) {
         singleton_kvs_t *e;
         HASH_FIND_STR(singleton_kvs, kvs_key, e);

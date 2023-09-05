@@ -646,7 +646,7 @@ do {                                                                            
 #define HASH_JEN(key,keylen,hashv)                                               \
 do {                                                                             \
   unsigned int _hj_i,_hj_j,_hj_k;                                                \
-  unsigned const char *_hj_key=(unsigned const char*)(key);                      \
+  const unsigned char *_hj_key=(const unsigned char*)(key);                      \
   hashv = 0xfeedbeefu;                                                           \
   _hj_i = _hj_j = 0x9e3779b9u;                                                   \
   _hj_k = (unsigned int)(keylen);                                                \
@@ -697,7 +697,7 @@ do {                                                                            
 #endif
 #define HASH_SFH(key,keylen,hashv)                                               \
 do {                                                                             \
-  unsigned const char *_sfh_key=(unsigned const char*)(key);                     \
+  const unsigned char *_sfh_key=(const unsigned char*)(key);                     \
   uint32_t _sfh_tmp, _sfh_len = (uint32_t)keylen;                                \
                                                                                  \
   unsigned int _sfh_rem = _sfh_len & 3U;                                         \
