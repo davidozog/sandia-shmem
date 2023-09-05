@@ -1470,9 +1470,13 @@ int query_for_fabric(struct fabric_info *info)
         info->p_info->domain_attr->mr_key_size = 0;
 #endif
 
+#ifndef USE_FI_HMEM
     shmem_internal_assertp(info->p_info->tx_attr->inject_size >= shmem_transport_ofi_max_buffered_send);
-    //shmem_transport_ofi_max_buffered_send = info->p_info->tx_attr->inject_size;
+    shmem_transport_ofi_max_buffered_send = info->p_info->tx_attr->inject_size;
+#else
     shmem_transport_ofi_max_buffered_send = 0;
+#endif
+
 #ifdef ENABLE_MR_RMA_EVENT
     shmem_transport_ofi_mr_rma_event = (info->p_info->domain_attr->mr_mode & FI_MR_RMA_EVENT) != 0;
 #endif

@@ -564,7 +564,9 @@ void shmem_transport_put_scalar(shmem_transport_ctx_t* ctx, void *target, const
 
     shmem_transport_ofi_get_mr(target, pe, &addr, &key);
 
-    //shmem_internal_assert(len <= shmem_transport_ofi_max_buffered_send);
+#ifndef USE_FI_HMEM
+    shmem_internal_assert(len <= shmem_transport_ofi_max_buffered_send);
+#endif
 
     SHMEM_TRANSPORT_OFI_CTX_LOCK(ctx);
     SHMEM_TRANSPORT_OFI_CNTR_INC(&ctx->pending_put_cntr);
