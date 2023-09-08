@@ -811,8 +811,10 @@ int allocate_recv_cntr_mr(void)
 #endif
 
 #ifdef USE_FI_HMEM
-    ret = ofi_mr_regattr_bind();
-    OFI_CHECK_RETURN_STR(ret, "OFI MR registration with HMEM failed");
+    if (shmem_external_heap_pre_initialized) {
+        ret = ofi_mr_regattr_bind();
+        OFI_CHECK_RETURN_STR(ret, "OFI MR registration with HMEM failed");
+    }
 #endif
     ret = ofi_mr_reg_bind(flags);
     OFI_CHECK_RETURN_STR(ret, "OFI MR registration failed");
@@ -920,10 +922,12 @@ int publish_mr_info(void)
 #endif /* !ENABLE_MR_SCALABLE */
 
 #ifdef USE_FI_HMEM
-    int err = publish_external_mr_info();
-    if (err) {
-        RAISE_WARN_STR("Publish of external mr info failed");
-        return 1;
+    if (shmem_external_heap_pre_initialized) {
+        int err = publish_external_mr_info();
+        if (err) {
+            RAISE_WARN_STR("Publish of external mr info failed");
+            return 1;
+        }
     }
 #endif
 
@@ -1051,10 +1055,12 @@ int populate_mr_tables(void)
 #endif /* !ENABLE_MR_SCALABLE */
 
 #ifdef USE_FI_HMEM
-    int err = populate_external_mr_tables();
-    if (err) {
-        RAISE_WARN_STR("Populate external MR tables failed");
-        return 1;
+    if (shmem_external_heap_pre_initialized) {
+        int err = populate_external_mr_tables();
+        if (err) {
+            RAISE_WARN_STR("Populate external MR tables failed");
+            return 1;
+        }
     }
 #endif
 
@@ -2017,8 +2023,10 @@ int shmem_transport_fini(void)
 #endif
 
 #ifdef USE_FI_HMEM
-    ret = fi_close(&shmem_transport_ofi_external_heap_mrfd->fid);
-    OFI_CHECK_ERROR_MSG(ret, "External heap MR close failed (%s)\n", fi_strerror(errno));
+    if (shmem_external_heap_pre_initialized) {
+        ret = fi_close(&shmem_transport_ofi_external_heap_mrfd->fid);
+        OFI_CHECK_ERROR_MSG(ret, "External heap MR close failed (%s)\n", fi_strerror(errno));
+    }
 #endif
 
     ret = fi_close(&shmem_transport_ofi_target_ep->fid);
