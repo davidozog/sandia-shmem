@@ -1476,7 +1476,7 @@ int query_for_fabric(struct fabric_info *info)
         info->p_info->domain_attr->mr_key_size = 0;
 #endif
 
-#ifndef USE_FI_HMEM
+#ifndef DISABLE_OFI_INJECT
     shmem_internal_assertp(info->p_info->tx_attr->inject_size >= shmem_transport_ofi_max_buffered_send);
     shmem_transport_ofi_max_buffered_send = info->p_info->tx_attr->inject_size;
 #else

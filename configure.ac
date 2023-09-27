@@ -252,6 +252,12 @@ AS_IF([test "$enable_bounce_buffers" = "no"],
       [AC_DEFINE([DEFAULT_BOUNCE_SIZE], [0], [Default bounce buffer threshold])],
       [AC_DEFINE([DEFAULT_BOUNCE_SIZE], [2048], [Default bounce buffer threshold])])
 
+AC_ARG_ENABLE([ofi-inject],
+    [AC_HELP_STRING([--disable-ofi-inject],
+                    [Disable OFI inject by default (default: enabled)])])
+AS_IF([test "$enable_ofi_inject" = "no"],
+      [AC_DEFINE([DISABLE_OFI_INJECT], [0], [If defined, the OFI will not use fi_inject.])])
+
 AC_ARG_WITH([oshrun-launcher],
     [AC_HELP_STRING([--with-oshrun-launcher],
                     [Set launcher to be used by oshrun launcher wrapper. (default: auto)])])
