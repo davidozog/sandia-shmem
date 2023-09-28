@@ -155,7 +155,7 @@ do {                                                                            
 do {                                                                             \
   (out) = NULL;                                                                  \
   if (head) {                                                                    \
-    unsigned int _hf_bkt;                                                        \
+    unsigned _hf_bkt;                                                            \
     HASH_TO_BKT(hashval, (head)->hh.tbl->num_buckets, _hf_bkt);                  \
     if (HASH_BLOOM_TEST((head)->hh.tbl, hashval) != 0) {                         \
       HASH_FIND_IN_BKT((head)->hh.tbl, hh, (head)->hh.tbl->buckets[ _hf_bkt ], keyptr, keylen, hashval, out); \
@@ -264,14 +264,14 @@ do {                                                                            
 
 #define HASH_REPLACE(hh,head,fieldname,keylen_in,add,replaced)                   \
 do {                                                                             \
-  unsigned int _hr_hashv;                                                        \
+  unsigned _hr_hashv;                                                            \
   HASH_VALUE(&((add)->fieldname), keylen_in, _hr_hashv);                         \
   HASH_REPLACE_BYHASHVALUE(hh, head, fieldname, keylen_in, _hr_hashv, add, replaced); \
 } while (0)
 
 #define HASH_REPLACE_INORDER(hh,head,fieldname,keylen_in,add,replaced,cmpfcn)    \
 do {                                                                             \
-  unsigned int _hr_hashv;                                                        \
+  unsigned _hr_hashv;                                                            \
   HASH_VALUE(&((add)->fieldname), keylen_in, _hr_hashv);                         \
   HASH_REPLACE_BYHASHVALUE_INORDER(hh, head, fieldname, keylen_in, _hr_hashv, add, replaced, cmpfcn); \
 } while (0)
@@ -353,7 +353,7 @@ do {                                                                            
   IF_HASH_NONFATAL_OOM( int _ha_oomed = 0; )                                     \
   (add)->hh.hashv = (hashval);                                                   \
   (add)->hh.key = (char*) (keyptr);                                              \
-  (add)->hh.keylen = (unsigned int) (keylen_in);                                 \
+  (add)->hh.keylen = (unsigned) (keylen_in);                                     \
   if (!(head)) {                                                                 \
     (add)->hh.next = NULL;                                                       \
     (add)->hh.prev = NULL;                                                       \
@@ -383,7 +383,7 @@ do {                                                                            
 
 #define HASH_ADD_KEYPTR_INORDER(hh,head,keyptr,keylen_in,add,cmpfcn)             \
 do {                                                                             \
-  unsigned int _hs_hashv;                                                        \
+  unsigned _hs_hashv;                                                            \
   HASH_VALUE(keyptr, keylen_in, _hs_hashv);                                      \
   HASH_ADD_KEYPTR_BYHASHVALUE_INORDER(hh, head, keyptr, keylen_in, _hs_hashv, add, cmpfcn); \
 } while (0)
@@ -417,7 +417,7 @@ do {                                                                            
 
 #define HASH_ADD_KEYPTR(hh,head,keyptr,keylen_in,add)                            \
 do {                                                                             \
-  unsigned int _ha_hashv;                                                        \
+  unsigned _ha_hashv;                                                            \
   HASH_VALUE(keyptr, keylen_in, _ha_hashv);                                      \
   HASH_ADD_KEYPTR_BYHASHVALUE(hh, head, keyptr, keylen_in, _ha_hashv, add);      \
 } while (0)
@@ -617,7 +617,7 @@ do {                                                                            
 
 #define HASH_OAT(key,keylen,hashv)                                               \
 do {                                                                             \
-  unsigned int _ho_i;                                                            \
+  unsigned _ho_i;                                                                \
   const unsigned char *_ho_key=(const unsigned char*)(key);                      \
   hashv = 0;                                                                     \
   for(_ho_i=0; _ho_i < keylen; _ho_i++) {                                        \
@@ -645,28 +645,28 @@ do {                                                                            
 
 #define HASH_JEN(key,keylen,hashv)                                               \
 do {                                                                             \
-  unsigned int _hj_i,_hj_j,_hj_k;                                                \
-  const unsigned char *_hj_key=(const unsigned char*)(key);                      \
+  unsigned _hj_i,_hj_j,_hj_k;                                                    \
+  unsigned const char *_hj_key=(unsigned const char*)(key);                      \
   hashv = 0xfeedbeefu;                                                           \
   _hj_i = _hj_j = 0x9e3779b9u;                                                   \
-  _hj_k = (unsigned int)(keylen);                                                \
+  _hj_k = (unsigned)(keylen);                                                    \
   while (_hj_k >= 12U) {                                                         \
-    _hj_i +=    (_hj_key[0] + ( (unsigned int)_hj_key[1] << 8 )                  \
-        + ( (unsigned int)_hj_key[2] << 16 )                                     \
-        + ( (unsigned int)_hj_key[3] << 24 ) );                                  \
-    _hj_j +=    (_hj_key[4] + ( (unsigned int)_hj_key[5] << 8 )                  \
-        + ( (unsigned int)_hj_key[6] << 16 )                                     \
-        + ( (unsigned int)_hj_key[7] << 24 ) );                                  \
-    hashv += (_hj_key[8] + ( (unsigned int)_hj_key[9] << 8 )                     \
-        + ( (unsigned int)_hj_key[10] << 16 )                                    \
-        + ( (unsigned int)_hj_key[11] << 24 ) );                                 \
+    _hj_i +=    (_hj_key[0] + ( (unsigned)_hj_key[1] << 8 )                      \
+        + ( (unsigned)_hj_key[2] << 16 )                                         \
+        + ( (unsigned)_hj_key[3] << 24 ) );                                      \
+    _hj_j +=    (_hj_key[4] + ( (unsigned)_hj_key[5] << 8 )                      \
+        + ( (unsigned)_hj_key[6] << 16 )                                         \
+        + ( (unsigned)_hj_key[7] << 24 ) );                                      \
+    hashv += (_hj_key[8] + ( (unsigned)_hj_key[9] << 8 )                         \
+        + ( (unsigned)_hj_key[10] << 16 )                                        \
+        + ( (unsigned)_hj_key[11] << 24 ) );                                     \
                                                                                  \
      HASH_JEN_MIX(_hj_i, _hj_j, hashv);                                          \
                                                                                  \
      _hj_key += 12;                                                              \
      _hj_k -= 12U;                                                               \
   }                                                                              \
-  hashv += (unsigned int)(keylen);                                               \
+  hashv += (unsigned)(keylen);                                                   \
   switch ( _hj_k ) {                                                             \
     case 11: hashv += ( (unsigned)_hj_key[10] << 24 ); /* FALLTHROUGH */         \
     case 10: hashv += ( (unsigned)_hj_key[9] << 16 );  /* FALLTHROUGH */         \
@@ -697,10 +697,10 @@ do {                                                                            
 #endif
 #define HASH_SFH(key,keylen,hashv)                                               \
 do {                                                                             \
-  const unsigned char *_sfh_key=(const unsigned char*)(key);                     \
+  unsigned const char *_sfh_key=(unsigned const char*)(key);                     \
   uint32_t _sfh_tmp, _sfh_len = (uint32_t)keylen;                                \
                                                                                  \
-  unsigned int _sfh_rem = _sfh_len & 3U;                                         \
+  unsigned _sfh_rem = _sfh_len & 3U;                                             \
   _sfh_len >>= 2;                                                                \
   hashv = 0xcafebabeu;                                                           \
                                                                                  \
@@ -888,8 +888,8 @@ do {                                                                            
 #define HASH_SORT(head,cmpfcn) HASH_SRT(hh,head,cmpfcn)
 #define HASH_SRT(hh,head,cmpfcn)                                                 \
 do {                                                                             \
-  unsigned int _hs_i;                                                            \
-  unsigned int _hs_looping,_hs_nmerges,_hs_insize,_hs_psize,_hs_qsize;           \
+  unsigned _hs_i;                                                                \
+  unsigned _hs_looping,_hs_nmerges,_hs_insize,_hs_psize,_hs_qsize;               \
   struct UT_hash_handle *_hs_p, *_hs_q, *_hs_e, *_hs_list, *_hs_tail;            \
   if (head != NULL) {                                                            \
     _hs_insize = 1;                                                              \
@@ -1067,7 +1067,7 @@ for(((el)=(head)), ((tmp)=DECLTYPE(el)((head!=NULL)?(head)->hh.next:NULL));     
 
 typedef struct UT_hash_bucket {
    struct UT_hash_handle *hh_head;
-   unsigned int count;
+   unsigned count;
 
    /* expand_mult is normally set to 0. In this situation, the max chain length
     * threshold is enforced at its default value, HASH_BKT_CAPACITY_THRESH. (If
@@ -1081,7 +1081,7 @@ typedef struct UT_hash_bucket {
     * It is better to let its chain length grow to a longer yet-still-bounded
     * value, than to do an O(n) bucket expansion too often.
     */
-   unsigned int expand_mult;
+   unsigned expand_mult;
 
 } UT_hash_bucket;
 
@@ -1091,19 +1091,19 @@ typedef struct UT_hash_bucket {
 
 typedef struct UT_hash_table {
    UT_hash_bucket *buckets;
-   unsigned int num_buckets, log2_num_buckets;
-   unsigned int num_items;
+   unsigned num_buckets, log2_num_buckets;
+   unsigned num_items;
    struct UT_hash_handle *tail; /* tail hh in app order, for fast append    */
    ptrdiff_t hho; /* hash handle offset (byte pos of hash handle in element */
 
    /* in an ideal situation (all buckets used equally), no bucket would have
     * more than ceil(#items/#buckets) items. that's the ideal chain length. */
-   unsigned int ideal_chain_maxlen;
+   unsigned ideal_chain_maxlen;
 
    /* nonideal_items is the number of items in the hash whose chain position
     * exceeds the ideal chain maxlen. these items pay the penalty for an uneven
     * hash distribution; reaching them in a chain traversal takes >ideal steps */
-   unsigned int nonideal_items;
+   unsigned nonideal_items;
 
    /* ineffective expands occur when a bucket doubling was performed, but
     * afterward, more than half the items in the hash had nonideal chain
@@ -1111,7 +1111,7 @@ typedef struct UT_hash_table {
     * further expansion, as it's not helping; this happens when the hash
     * function isn't a good fit for the key domain. When expansion is inhibited
     * the hash will still work, albeit no longer in constant time. */
-   unsigned int ineff_expands, noexpand;
+   unsigned ineff_expands, noexpand;
 
    uint32_t signature; /* used only to find hash tables in external analysis */
 #ifdef HASH_BLOOM
