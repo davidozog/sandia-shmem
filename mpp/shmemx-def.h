@@ -23,9 +23,9 @@ typedef struct {
 } shmemx_pcntr_t;
 
 #if SHMEM_HAVE_ATTRIBUTE_VISIBILITY == 1
-    __attribute__((visibility("default"))) extern shmem_team_t SHMEMX_TEAM_HOST;
+    __attribute__((visibility("default"))) extern shmem_team_t SHMEMX_TEAM_NODE;
 #else
-    extern shmem_team_t SHMEMX_TEAM_HOST;
+    extern shmem_team_t SHMEMX_TEAM_NODE;
 #endif
 
 #define SHMEMX_EXTERNAL_HEAP_ZE 0
