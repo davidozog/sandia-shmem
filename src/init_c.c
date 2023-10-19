@@ -74,7 +74,7 @@ shmem_init(void)
 }
 
 void SHMEM_FUNCTION_ATTRIBUTES
-shmemx_runtime_init(void)
+shmemx_heap_preinit(void)
 {
     int tl_provided, ret;
 
@@ -82,7 +82,7 @@ shmemx_runtime_init(void)
         RAISE_ERROR_STR("attempt to reinitialize library");
     }
 
-    ret = shmem_internal_runtime_init(SHMEM_THREAD_SINGLE, &tl_provided);
+    ret = shmem_internal_heap_preinit(SHMEM_THREAD_SINGLE, &tl_provided);
     if (ret) abort();
 }
 

@@ -495,7 +495,7 @@ shmem_malloc_with_hints(size_t size, long hints)
 }
 
 void SHMEM_FUNCTION_ATTRIBUTES 
-shmemx_heap_preinit(void *base, size_t size, int device_type, int device_index) {
+shmemx_heap_create(void *base, size_t size, int device_type, int device_index) {
 
     if (shmem_internal_initialized) {
         RAISE_WARN_MSG("Ignoring pre-setup. Heap already initialized\n");
