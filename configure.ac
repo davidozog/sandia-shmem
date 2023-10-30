@@ -38,6 +38,8 @@ AC_CONFIG_HEADERS([src/config.h])
 
 AC_CANONICAL_HOST
 
+OPAL_CONFIGURE_SETUP
+
 OPAL_CHECK_ATTRIBUTES
 AS_IF([test "$opal_cv___attribute__deprecated" = 1],
       [SHMEM_AC_HAVE_ATTRIBUTE_DEPRECATED=1],
@@ -120,6 +122,11 @@ AS_IF([test "$enable_threads" != "no"], [
              AC_DEFINE([USE_THREAD_COMPLETION], [1], [Support SHMEM_THREAD_MULTIPLE using FI_THREAD_COMPLETION instead of FI_THREAD_SAFE])])
        ])
 AM_CONDITIONAL([HAVE_PTHREADS], [test "$HAVE_POSIX_THREADS" = "1"])
+
+AS_IF([test "$with_hwloc" != "no"], [
+       OPAL_CONFIG_HWLOC
+       AC_DEFINE([USE_HWLOC], [1], [If defined, hwloc will be used to assign NICs based on CPU affinity.])
+    ])
 
 AS_IF([test "$enable_threads" != "no"], [
        AS_IF([test "$enable_openmp" != "no"], [
@@ -283,13 +290,6 @@ AC_ARG_ENABLE([ofi-hmem],
                     [Use FI_HMEM to support transfers to and from device memory. (default: disabled)])])
 AS_IF([test "$enable_ofi_hmem" = "yes"],
       [AC_DEFINE([USE_FI_HMEM], [1], [If defined, the OFI transport will enable FI_HMEM.])])
-
-AC_ARG_ENABLE([hwloc],
-    [AC_HELP_STRING([--enable-hwloc],
-                    [Use hwloc to optimize assignment of NICs to PEs in multi-NIC environments. (default: disabled)])])
-AS_IF([test "$enable_hwloc" = "yes"],
-      [AC_DEFINE([USE_HWLOC], [1], [If defined, hwloc will be used to assign NICs based on CPU affinity.])])
-
 
 PKG_INSTALLDIR()
 
@@ -877,6 +877,9 @@ if test -n "$with_cuda" -a "$with_cuda" != "no" -a "$with_cuda" != "yes" ; then
 fi
 if test -n "$with_pmi" -a "$with_pmi" != "no" -a "$with_pmi" != "yes" ; then
   DISTCHECK_CONFIGURE_FLAGS="$DISTCHECK_CONFIGURE_FLAGS --with-pmi=${with_pmi}"
+fi
+if test -n "$with_hwloc" -a "$with_hwloc" != "no" -a "$with_hwloc" != "yes" ; then
+  DISTCHECK_CONFIGURE_FLAGS="$DISTCHECK_CONFIGURE_FLAGS --with-hwloc=${with_hwloc}"
 fi
 if test "$enable_pmi_simple" = "yes" ; then
   DISTCHECK_CONFIGURE_FLAGS="$DISTCHECK_CONFIGURE_FLAGS --enable-pmi-simple"
