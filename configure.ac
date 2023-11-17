@@ -1057,6 +1057,11 @@ if test "$enable_threads" != "no"; then
 else
     echo "  Thread support: no"
 fi
+if test "$with_hwloc" != "no"; then
+    echo "  hwloc support:  yes"
+else
+    echo "  hwloc support:  no"
+fi
 if test "$enable_error_checking" != "yes"; then
     echo "  Error checking: no"
 else
