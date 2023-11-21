@@ -51,6 +51,22 @@ extern long shmem_internal_data_length;
 
 extern unsigned int shmem_internal_rand_seed;
 
+#ifdef USE_HWLOC
+#include <hwloc.h>
+
+struct shmem_cpuset_t {
+    hwloc_obj_t socket;
+    hwloc_bitmap_t bindset;
+    struct shmem_cpuset_t *next;
+};
+typedef struct shmem_cpuset_t shmem_cpuset_t;
+
+extern hwloc_topology_t shmem_topology;
+//TODO: Make this a config. (or env.?) variable
+#define HWLOC_ENFORCE_SINGLE_SOCKET
+extern struct shmem_cpuset_t shmem_bindsets;
+#endif
+
 #define SHMEM_INTERNAL_HEAP_OVERHEAD (1024*1024)
 #define SHMEM_INTERNAL_DIAG_STRLEN 1024
 #define SHMEM_INTERNAL_DIAG_WRAPLEN 72

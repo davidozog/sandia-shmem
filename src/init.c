@@ -99,6 +99,13 @@ int shmem_internal_thread_level;
 
 unsigned int shmem_internal_rand_seed;
 
+#ifdef USE_HWLOC
+#include <hwloc.h>
+
+hwloc_topology_t shmem_topology;
+shmem_cpuset_t shmem_cpusets;
+#endif
+
 #ifdef ENABLE_THREADS
 shmem_internal_mutex_t shmem_internal_mutex_alloc;
 shmem_internal_mutex_t shmem_internal_mutex_rand_r;
@@ -389,7 +396,48 @@ shmem_internal_heap_postinit(void)
               shmem_internal_data_base, shmem_internal_data_length);
 
 #ifdef HAVE_SCHED_GETAFFINITY
-    if (shmem_internal_params.DEBUG) {
+#ifdef USE_HWLOC
+    ret = hwloc_topology_init(&shmem_topology);
+    if (ret < 0) {
+        RETURN_ERROR_MSG("hwloc_topology_init failed (%s)\n", strerror(errno));
+    }
+
+    ret = hwloc_topology_set_io_types_filter(shmem_topology, HWLOC_TYPE_FILTER_KEEP_ALL);
+	if (ret < 0) {
+        RETURN_ERROR_MSG("hwloc_topology_set_io_types_filter failed (%s)\n", strerror(errno));
+    }
+
+    ret = hwloc_topology_load(shmem_topology);
+    if (ret < 0) {
+        RETURN_ERROR_MSG("hwloc_topology_load failed (%s)\n", strerror(errno));
+    }
+#ifdef HWLOC_ENFORCE_SINGLE_SOCKET
+    hwloc_bitmap_t bindset = hwloc_bitmap_alloc();
+    hwloc_bitmap_t bindset_all = hwloc_bitmap_alloc();
+    hwloc_bitmap_t bindset_socket = hwloc_bitmap_alloc();
+
+    ret = hwloc_get_proc_last_cpu_location(shmem_topology, getpid(), bindset, HWLOC_CPUBIND_PROCESS);
+    if (ret < 0) {
+        RETURN_ERROR_MSG("hwloc_get_proc_last_cpu_location failed (%s)\n", strerror(errno));
+    }
+
+    ret = hwloc_get_proc_cpubind(shmem_topology, getpid(), bindset_all, HWLOC_CPUBIND_PROCESS);
+    if (ret < 0) {
+        RETURN_ERROR_MSG("hwloc_get_proc_cpubind failed (%s)\n", strerror(errno));
+    }
+
+    hwloc_obj_t socket = hwloc_get_next_obj_covering_cpuset_by_type(shmem_topology, bindset, HWLOC_OBJ_PACKAGE, NULL);
+    if (!socket) RETURN_ERROR_MSG("hwloc_get_next_obj_covering_cpuset_by_type failed (could not detect object of type 'HWLOC_OBJ_PACKAGE' in provided cpuset)\n");
+    hwloc_bitmap_and(bindset_socket, bindset_all, socket->cpuset);
+    hwloc_set_proc_cpubind(shmem_topology, getpid(), bindset_socket, HWLOC_CPUBIND_PROCESS); //Include HWLOC_CPUBIND_STRICT in flags?
+
+    hwloc_bitmap_free(bindset);
+    hwloc_bitmap_free(bindset_all);
+    hwloc_bitmap_free(bindset_socket);
+#endif // HWLOC_ENFORCE_SINGLE_SOCKET
+#endif // USE_HWLOC
+
+if (shmem_internal_params.DEBUG) {
         cpu_set_t my_set;
 
         CPU_ZERO(&my_set);
@@ -424,7 +472,7 @@ shmem_internal_heap_postinit(void)
             free(cores_str_wrap);
         }
     }
-#endif
+#endif // HAVE_SCHED_GETAFFINITY
 
     /* Initialize transport devices */
     ret = shmem_transport_init();
