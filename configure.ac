@@ -76,6 +76,11 @@ AC_ARG_ENABLE([completion-polling],
     [AC_HELP_STRING([--enable-completion-polling],
                     [Enable polling in quiet, fence, and local completion operations (default:disabled)])])
 
+AC_ARG_ENABLE([hwloc-enforce-single-socket],
+    [AC_HELP_STRING([--enable-hwloc-enforce-single-socket],
+                    [Repin process if assigned affinity to cores across multiple sockets (default:disabled)])])
+AS_IF([test "$enable_hwloc_enforce_single_socket" = "yes"], [AC_DEFINE([HWLOC_ENFORCE_SINGLE_SOCKET], [1], [Re-assign CPU affinity on processes with affinity to cores on multiple sockets])])
+
 AC_ARG_ENABLE([manual-progress],
     [AC_HELP_STRING([--enable-manual-progress],
                     [Enable intermittent progress calls inside transport layer (default:disabled)])])
