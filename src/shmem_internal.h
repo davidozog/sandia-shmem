@@ -62,8 +62,6 @@ struct shmem_cpuset_t {
 typedef struct shmem_cpuset_t shmem_cpuset_t;
 
 extern hwloc_topology_t shmem_topology;
-//TODO: Make this a config. (or env.?) variable
-#define HWLOC_ENFORCE_SINGLE_SOCKET
 extern struct shmem_cpuset_t shmem_bindsets;
 #endif
 
