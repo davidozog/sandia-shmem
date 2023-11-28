@@ -101,9 +101,7 @@ unsigned int shmem_internal_rand_seed;
 
 #ifdef USE_HWLOC
 #include <hwloc.h>
-
 hwloc_topology_t shmem_topology;
-shmem_cpuset_t shmem_cpusets;
 #endif
 
 #ifdef ENABLE_THREADS

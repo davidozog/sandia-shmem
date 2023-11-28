@@ -1373,7 +1373,7 @@ struct fi_info *assign_nic_with_hwloc(struct fi_info *fabric, struct fi_info **p
             num_close_nics++;
         }
     }
-    DEBUG_MSG("num_close_nics = %zu\n", num_close_nics);
+    DEBUG_MSG("Num. NICs w/ affinity to process: %zu\n", num_close_nics);
 
     if (!close_provs) RAISE_ERROR_MSG("cannot find any valid network providers\n");
     last_added->next = NULL;
@@ -1509,8 +1509,6 @@ int query_for_fabric(struct fabric_info *info)
 
     /* If the user supplied a fabric or domain name, use it to select the
      * fabric.  Otherwise, select the first fabric in the list. */
-
-    //if (shmem_internal_params.USE_MULTIRAIL) {
     int num_nics = 0;
     struct fi_info *fallback = NULL;
     struct fi_info *filtered_fabrics_list_head = NULL;
@@ -1537,7 +1535,6 @@ int query_for_fabric(struct fabric_info *info)
     else {
         filtered_fabrics_list_head = info->fabrics;
     }
-    //TODO: Should probably check that filtered_fabrics_list_head is not NULL, otherwise error
 
     struct fi_info *cur_fabric;
 
@@ -1553,11 +1550,8 @@ int query_for_fabric(struct fabric_info *info)
         }
     }
 
-    if (num_nics == 0) {
-        if (shmem_internal_params.REQUIRE_MULTIRAIL_ENV)
-            RAISE_ERROR_MSG("Unable to detect multiple NICs\n");
-        else
-            DEBUG_MSG("Unable to detect multiple NICs\n");
+    DEBUG_MSG("Total num. NICs detected: %d\n", num_nics);
+    if ((num_nics == 0) || (shmem_internal_params.DISABLE_MULTIRAIL)) {
         info->p_info = fallback;
     }
     else {
@@ -1567,24 +1561,15 @@ int query_for_fabric(struct fabric_info *info)
             prov_list[idx++] = cur_fabric;
         }
         qsort(prov_list, num_nics, sizeof(struct fi_info *), compare_nic_names);
-#ifdef USE_HWLOC
         //DEBUG_MSG("[%d]: local_pe = %d\n", shmem_internal_my_pe, shmem_team_my_pe(SHMEMX_TEAM_NODE));
+#ifdef USE_HWLOC
         info->p_info = assign_nic_with_hwloc(info->p_info, prov_list, num_nics);
-        //info->p_info = prov_list[shmem_team_my_pe(SHMEMX_TEAM_NODE) % num_nics];
 #else
         //Round-robin assignment of NICs to PEs
         //info->p_info = prov_list[shmem_team_my_pe(SHMEMX_TEAM_NODE) % num_nics];
         info->p_info = prov_list[shmem_internal_my_pe % num_nics];
 #endif
     }
-    DEBUG_MSG("provider: %s\n", info->p_info->domain_attr->name);
-
-    // TODO: Do we want to allow a user to explicitly request not to use multi-NIC functionality? If so, this complicates
-    // the usage of SHMEM_REQUIRE_MULTIRAIL_ENV (which would likely be renamed to SHMEM_USE_MULTIRAIL). Could not be simple bool,
-    // would need to be tri-state (unset/default, true, or false):
-    //   unset/default: Attempt to use multiple NICs, but if not possible, use single NIC
-    //   true: If multiple NICs not detected, raise error
-    //   false: Do not attempt to utilize multiple NICs (ie. assign all PEs the same provider for info->p_info)
 
     if (NULL == info->p_info) {
         RAISE_WARN_MSG("OFI transport, no valid fabric (prov=%s, fabric=%s, domain=%s)\n",
@@ -1593,6 +1578,7 @@ int query_for_fabric(struct fabric_info *info)
                        info->domain_name != NULL ? info->domain_name : "<auto>");
         return ret;
     }
+    DEBUG_MSG("provider: %s\n", info->p_info->domain_attr->name);
 
     if (info->p_info->ep_attr->max_msg_size > 0) {
         shmem_transport_ofi_max_msg_size = info->p_info->ep_attr->max_msg_size;
