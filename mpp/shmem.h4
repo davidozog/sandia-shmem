@@ -45,6 +45,13 @@ include(shmem_c_func.h4)dnl
 #define SHMEM_CXX_ATTRIBUTE_DEPRECATED
 #endif
 
+template <typename T>
+static inline void shmem_put_template(T *dest, const T *src, size_t nelems, int pe) {
+  shmem_putmem(dest, src, nelems * sizeof(T), pe);
+  //shmem_putmem(dest, src, nelems, pe);
+  //shmem_put(dest, src, nelems, pe);
+}
+
 /* Blocking block, scalar, and block-strided put */
 define(`SHMEM_CXX_PUT',
 `static inline void shmem_put($2* dest, const $2* source,

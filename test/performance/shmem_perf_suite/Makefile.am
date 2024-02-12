@@ -12,7 +12,7 @@ check_PROGRAMS = \
 	shmem_latency_put_perf_nb \
 	shmem_latency_get_perf \
 	shmem_latency_get_perf_nb \
-	shmem_bw_put_perf \
+	#shmem_bw_put_perf \
 	shmem_bw_put_perf_nb \
 	shmem_bibw_put_perf \
 	shmem_bibw_put_perf_nb \
@@ -23,7 +23,8 @@ check_PROGRAMS = \
 	shmem_bw_atomics_perf \
 	shmem_bibw_atomics_perf \
 	shmem_bw_nb_atomics_perf \
-	shmem_bibw_nb_atomics_perf
+	shmem_bibw_nb_atomics_perf \
+	cxx_shmem_bw_put_perf
 
 if HAVE_OPENMP
 check_PROGRAMS += \
@@ -109,5 +110,7 @@ shmem_latency_get_ctx_perf_CFLAGS = $(AM_OPENMP_CFLAGS)
 
 shmem_latency_get_ctx_perf_nb_SOURCES = shmem_latency_get_ctx_perf.c
 shmem_latency_get_ctx_perf_nb_CFLAGS = $(AM_OPENMP_CFLAGS) -DUSE_NONBLOCKING_API
+
+cxx_shmem_bw_put_perf_SOURCES = cxx_shmem_bw_put_perf.cpp
 
 AM_CPPFLAGS += -DENABLE_THREADS

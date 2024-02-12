@@ -25,6 +25,7 @@
  * SOFTWARE.
  */
 #include <target_put.h>
+#include <shmem.h>
 
 static inline void uni_bw_put(int len, perf_metrics_t *metric_info)
 {
@@ -60,7 +61,12 @@ static inline void uni_bw_put(int len, perf_metrics_t *metric_info)
 #ifdef USE_NONBLOCKING_API
                 shmem_putmem_nbi(metric_info->dest, metric_info->src, len, dest);
 #else
+#if __cplusplus >= 201402L
+                //if (i == 0 && j == 0) printf("WARMUP!!!!!!!!!!!!!!!!!!!\n");
                 shmem_putmem(metric_info->dest, metric_info->src, len, dest);
+                //shmem_put_template<char>(metric_info->dest, metric_info->src, len, dest);
+                //shmem_put(metric_info->dest, metric_info->src, len, dest);
+#endif
 #endif
             }
             shmem_quiet();
@@ -75,7 +81,11 @@ static inline void uni_bw_put(int len, perf_metrics_t *metric_info)
 #ifdef USE_NONBLOCKING_API
                 shmem_putmem_nbi(metric_info->dest, metric_info->src, len, dest);
 #else
+#if __cplusplus >= 201402L
                 shmem_putmem(metric_info->dest, metric_info->src, len, dest);
+                //shmem_put_template<char>(metric_info->dest, metric_info->src, len, dest);
+                //shmem_put(metric_info->dest, metric_info->src, len, dest);
+#endif
 #endif
             }
             shmem_quiet();

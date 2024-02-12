@@ -254,7 +254,7 @@ static char * aligned_buffer_alloc(int len)
     alignment = getpagesize();
 
 #ifndef VERSION_1_0
-    ptr1 = shmem_malloc(ptr_size + alignment + len);
+    ptr1 = (char*)shmem_malloc(ptr_size + alignment + len);
 #else
     ptr1 = shmalloc(ptr_size + alignment + len);
 #endif
@@ -758,7 +758,7 @@ red_PE_set validation_set(perf_metrics_t * const my_info, int *nPEs)
         } else {
             fprintf(stderr, "Warning: you are getting data from a node that "
                             "wasn't a part of the perf set \n ");
-            return 0;
+            return FIRST_HALF;
         }
     } else {
         assert(my_info->cstyle == COMM_INCAST);
