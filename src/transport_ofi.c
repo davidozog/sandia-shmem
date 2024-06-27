@@ -367,7 +367,7 @@ typedef enum {
 
 
 /* default CQ depth */
-uint64_t shmem_transport_ofi_max_poll = (1ULL<<30);
+uint64_t shmem_transport_ofi_max_poll = UINT64_MAX;
 
 
 enum stx_allocator_t {

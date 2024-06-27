@@ -44,7 +44,7 @@
 /* FIXME: The progress of back-to-back atomic ops over CXI is improved with an
  * occasional quiet operation. This constant sets the number of atomic ops that
  * occur between calls to quiet within shmem_internal_atomicv. */
-#define SOS_OFI_CXI_QUIET_RATE 200
+#define SOS_OFI_CXI_QUIET_RATE 125
 #endif
 
 #if ENABLE_TARGET_CNTR
@@ -393,7 +393,7 @@ void shmem_transport_probe(void)
     if (0 == pthread_mutex_trylock(&shmem_transport_ofi_progress_lock)) {
 #  endif
         struct fi_cq_entry buf;
-        int ret = fi_cq_read(shmem_transport_ofi_target_cq, &buf, 1);
+        int ret = fi_cq_read(shmem_transport_ofi_target_cq, &buf, 0);
         if (ret == 1)
             RAISE_WARN_STR("Unexpected event");
 #  ifdef USE_THREAD_COMPLETION
@@ -583,11 +583,11 @@ int try_again(shmem_transport_ctx_t *ctx, const int ret, uint64_t *polled) {
                 /* Poke CQ for errors to encourage progress */
                 struct fi_cq_err_entry e = {0};
                 ssize_t ret = fi_cq_readerr(ctx->cq, (void *)&e, 0);
-                if (ret == 1) {
+                if (ret < 0) {
                     const char *errmsg = fi_cq_strerror(ctx->cq, e.prov_errno,
                                                         e.err_data, NULL, 0);
-                    RAISE_ERROR_MSG("Error in operation: %s\n", errmsg);
-                } else if (ret && ret != -FI_EAGAIN) {
+                    RAISE_ERROR_MSG("Error (%lu) in operation: %s\n", ret, errmsg);
+                } else if (ret < 0 && ret != -FI_EAGAIN) {
                     RAISE_ERROR_MSG("Error reading from CQ (%zd)\n", ret);
                 }
             }
@@ -980,12 +980,10 @@ void shmem_transport_get_wait(shmem_transport_ctx_t* ctx)
 
         shmem_transport_probe();
 
-        if (success < cnt && fail == 0) {
+        if (success < cnt && (fail == 0 || errno == FI_SUCCESS)) {
             SHMEM_TRANSPORT_OFI_CTX_UNLOCK(ctx);
             SPINLOCK_BODY();
             SHMEM_TRANSPORT_OFI_CTX_LOCK(ctx);
-        } else if (fail) {
-            RAISE_ERROR_MSG("Operations completed in error (%" PRIu64 ")\n", fail);
         } else {
             SHMEM_TRANSPORT_OFI_CTX_UNLOCK(ctx);
             return;
