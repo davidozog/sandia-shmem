@@ -41,27 +41,57 @@ extern size_t shmem_transport_ofi_num_nics;
 #define ENABLE_TARGET_CNTR 0
 #endif
 
-#if ENABLE_TARGET_CNTR
-extern struct fid_cntr*                 shmem_transport_ofi_target_cntrfd;
-#endif
-#if ENABLE_MANUAL_PROGRESS
-extern struct fid_cq*                   shmem_transport_ofi_target_cq;
-#endif
-#ifndef ENABLE_MR_SCALABLE
-extern uint64_t*                        shmem_transport_ofi_target_heap_keys;
-extern uint64_t*                        shmem_transport_ofi_target_data_keys;
-#ifdef ENABLE_REMOTE_VIRTUAL_ADDRESSING
-extern int                              shmem_transport_ofi_use_absolute_address;
-#else
-extern uint8_t**                        shmem_transport_ofi_target_heap_addrs;
-extern uint8_t**                        shmem_transport_ofi_target_data_addrs;
-#endif /* ENABLE_REMOTE_VIRTUAL_ADDRESSING */
-#endif /* ENABLE_MR_SCALABLE */
+struct shmem_transport_ofi_target_ep {
+    struct fid_fabric*              fabfd;
+    struct fid_domain*              domainfd;
+    struct fid_av*                  avfd;
+    struct fid_ep*                  ep;
+    struct fid_cq*                  cq;
+    #if ENABLE_TARGET_CNTR
+    struct fid_cntr*                cntrfd;
+    #endif
+    #ifdef ENABLE_MR_SCALABLE
+    #ifdef ENABLE_REMOTE_VIRTUAL_ADDRESSING
+    struct fid_mr*                  mrfd;
+    #else  /* !ENABLE_REMOTE_VIRTUAL_ADDRESSING */
+    struct fid_mr*                  heap_mrfd;
+    struct fid_mr*                  data_mrfd;
+    #endif
+    #else  /* !ENABLE_MR_SCALABLE */
+    struct fid_mr*                  heap_mrfd;
+    struct fid_mr*                  data_mrfd;
+    uint64_t*                       heap_keys;
+    uint64_t*                       data_keys;
+    #ifdef ENABLE_REMOTE_VIRTUAL_ADDRESSING
+    int                             use_absolute_address;
+    #else
+    uint8_t**                       heap_addrs;
+    uint8_t**                       data_addrs;
+    #endif /* ENABLE_REMOTE_VIRTUAL_ADDRESSING */
+    #endif /* ENABLE_MR_SCALABLE */
+    #ifdef USE_FI_HMEM
+    struct fid_mr*                  external_heap_mrfd;
+    uint64_t*                       external_heap_keys;
+    uint8_t**                       external_heap_addrs;
+    #endif
+};
+extern struct shmem_transport_ofi_target_ep* shmem_transport_ofi_target_eps;
 
-#ifdef USE_FI_HMEM
-extern uint64_t*                        shmem_transport_ofi_external_heap_keys;
-extern uint8_t**                        shmem_transport_ofi_external_heap_addrs;
-#endif
+//#ifndef ENABLE_MR_SCALABLE
+//extern uint64_t*                        shmem_transport_ofi_target_heap_keys;
+//extern uint64_t*                        shmem_transport_ofi_target_data_keys;
+//#ifdef ENABLE_REMOTE_VIRTUAL_ADDRESSING
+//extern int                              shmem_transport_ofi_use_absolute_address;
+//#else
+//extern uint8_t**                        shmem_transport_ofi_target_heap_addrs;
+//extern uint8_t**                        shmem_transport_ofi_target_data_addrs;
+//#endif /* ENABLE_REMOTE_VIRTUAL_ADDRESSING */
+//#endif /* ENABLE_MR_SCALABLE */
+//
+//#ifdef USE_FI_HMEM
+//extern uint64_t*                        shmem_transport_ofi_external_heap_keys;
+//extern uint8_t**                        shmem_transport_ofi_external_heap_addrs;
+//#endif
 
 extern struct fid_mr*                   shmem_transport_ofi_mrfd_list[3];
 extern uint64_t                         shmem_transport_ofi_max_poll;
@@ -205,28 +235,28 @@ void shmem_transport_ofi_get_mr(const void *addr, int dest_pe,
                                 uint8_t **mr_addr, uint64_t *key) {
     if ((void*) addr >= shmem_internal_data_base &&
         (uint8_t*) addr < (uint8_t*) shmem_internal_data_base + shmem_internal_data_length) {
-        *key = shmem_transport_ofi_target_data_keys[dest_pe];
+        *key = shmem_transport_ofi_target_eps[0].data_keys[dest_pe]; /* FIX */
 #ifdef ENABLE_REMOTE_VIRTUAL_ADDRESSING
         if (shmem_transport_ofi_use_absolute_address)
             *mr_addr = (uint8_t *) addr;
         else
             *mr_addr = (void *) ((uint8_t *) addr - (uint8_t *) shmem_internal_data_base);
 #else
-        *mr_addr = shmem_transport_ofi_target_data_addrs[dest_pe] +
+        *mr_addr = shmem_transport_ofi_target_eps[0].data_addrs[dest_pe] + /* FIX */
             ((uint8_t *) addr - (uint8_t *) shmem_internal_data_base);
 #endif
     }
 
     else if ((void*) addr >= shmem_internal_heap_base &&
              (uint8_t*) addr < (uint8_t*) shmem_internal_heap_base + shmem_internal_heap_length) {
-        *key = shmem_transport_ofi_target_heap_keys[dest_pe];
+        *key = shmem_transport_ofi_target_eps[0].heap_keys[dest_pe]; /* FIX */
 #ifdef ENABLE_REMOTE_VIRTUAL_ADDRESSING
         if (shmem_transport_ofi_use_absolute_address)
             *mr_addr = (uint8_t *) addr;
         else
             *mr_addr = (void *) ((uint8_t *) addr - (uint8_t *) shmem_internal_heap_base);
 #else
-        *mr_addr = shmem_transport_ofi_target_heap_addrs[dest_pe] +
+        *mr_addr = shmem_transport_ofi_target_eps[0].heap_addrs[dest_pe] + /* FIX */
             ((uint8_t *) addr - (uint8_t *) shmem_internal_heap_base);
 #endif
     }
@@ -234,8 +264,8 @@ void shmem_transport_ofi_get_mr(const void *addr, int dest_pe,
     else if (shmem_external_heap_pre_initialized) {
         if ((void*) addr >= shmem_external_heap_base &&
              (uint8_t*) addr < (uint8_t*) shmem_external_heap_base + shmem_external_heap_length) {
-            *key = shmem_transport_ofi_external_heap_keys[dest_pe];
-            *mr_addr = shmem_transport_ofi_external_heap_addrs[dest_pe] +
+            *key = shmem_transport_ofi_target_eps[0].external_heap_keys[dest_pe]; /* FIX */
+            *mr_addr = shmem_transport_ofi_target_eps[0].external_heap_addrs[dest_pe] + /* FIX */
                 ((uint8_t *) addr - (uint8_t *) shmem_external_heap_base);
         }
     }
@@ -344,7 +374,6 @@ struct shmem_transport_ctx_t {
 typedef struct shmem_transport_ctx_t shmem_transport_ctx_t;
 extern shmem_transport_ctx_t shmem_transport_ctx_default;
 
-extern struct fid_ep* shmem_transport_ofi_target_ep;
 
 #ifdef USE_CTX_LOCK
 #define SHMEM_TRANSPORT_OFI_CTX_LOCK(ctx)                                       \
@@ -390,7 +419,7 @@ void shmem_transport_probe(void)
     if (0 == pthread_mutex_trylock(&shmem_transport_ofi_progress_lock)) {
 #  endif
         struct fi_cq_entry buf;
-        int ret = fi_cq_read(shmem_transport_ofi_target_cq, &buf, 1);
+        int ret = fi_cq_read(shmem_transport_ofi_target_eps[0].cq, &buf, 1); /* FIX */
         if (ret == 1)
             RAISE_WARN_STR("Unexpected event");
 #  ifdef USE_THREAD_COMPLETION
@@ -1508,7 +1537,7 @@ uint64_t shmem_transport_received_cntr_get(void)
     shmem_internal_assert(shmem_internal_thread_level == SHMEM_THREAD_SINGLE);
     /* NOTE-MT: This is only reachable in single-threaded runs, otherwise
      * we would need a mutex to support FI_THREAD_COMPLETION builds. */
-    return fi_cntr_read(shmem_transport_ofi_target_cntrfd);
+    return fi_cntr_read(shmem_transport_ofi_target_eps[0].cntrfd); /* FIX */
 #else
     RAISE_ERROR_STR("OFI transport configured for hard polling");
     return 0;
@@ -1522,7 +1551,7 @@ void shmem_transport_received_cntr_wait(uint64_t ge_val)
     shmem_internal_assert(shmem_internal_thread_level == SHMEM_THREAD_SINGLE);
     /* NOTE-MT: This is only reachable in single-threaded runs, otherwise
      * we would need a mutex to support FI_THREAD_COMPLETION builds. */
-    int ret = fi_cntr_wait(shmem_transport_ofi_target_cntrfd, ge_val, -1);
+    int ret = fi_cntr_wait(shmem_transport_ofi_target_eps[0].cntrfd, ge_val, -1); /* FIX */
 
     OFI_CHECK_ERROR(ret);
 #else
@@ -1599,7 +1628,7 @@ uint64_t shmem_transport_pcntr_get_completed_target(void)
 #  ifdef USE_THREAD_COMPLETION
     if (0 == pthread_mutex_lock(&shmem_transport_ofi_progress_lock)) {
 #  endif
-        cnt = fi_cntr_read(shmem_transport_ofi_target_cntrfd);
+        cnt = fi_cntr_read(shmem_transport_ofi_target_eps[0].cntrfd); /* FIX */
 #  ifdef USE_THREAD_COMPLETION
         pthread_mutex_unlock(&shmem_transport_ofi_progress_lock);
     }
