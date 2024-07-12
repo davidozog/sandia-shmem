@@ -65,6 +65,18 @@ struct fabric_info {
 };
 
 struct shmem_transport_ofi_target_ep* shmem_transport_ofi_target_eps;
+#ifndef ENABLE_MR_SCALABLE
+uint64_t*                        heap_keys;
+uint64_t*                        data_keys;
+#ifndef ENABLE_REMOTE_VIRTUAL_ADDRESSING
+uint8_t**                        heap_addrs;
+uint8_t**                        data_addrs;
+#endif
+#endif
+#ifdef USE_FI_HMEM
+uint64_t*                       external_heap_keys;
+uint8_t**                       external_heap_addrs;
+#endif
 
 //#ifdef ENABLE_MR_SCALABLE
 //#ifdef ENABLE_REMOTE_VIRTUAL_ADDRESSING
@@ -836,45 +848,47 @@ int allocate_recv_cntr_mr(size_t nic_idx)
 
 #ifdef USE_FI_HMEM
 static
-int publish_external_mr_info(size_t nic_idx)
+int publish_external_mr_info(void)
 {
-    int err;
-    uint64_t ext_heap_key;
-    struct fi_info *info = provider_list[nic_idx];
-    char ext_heap_key_name[32], ext_heap_addr_name[32];
+    for (size_t nic_idx = 0; nic_idx < shmem_transport_ofi_num_nics; nic_idx++) {
+        int err;
+        uint64_t ext_heap_key;
+        struct fi_info *info = provider_list[nic_idx];
+        char ext_heap_key_name[32], ext_heap_addr_name[32];
 
-    if (info->domain_attr->mr_mode & FI_MR_PROV_KEY) {
-        ext_heap_key = fi_mr_key(shmem_transport_ofi_target_eps[nic_idx].external_heap_mrfd);
-    } else {
-        ext_heap_key = 2;
-    }
+        if (info->domain_attr->mr_mode & FI_MR_PROV_KEY) {
+            ext_heap_key = fi_mr_key(shmem_transport_ofi_target_eps[nic_idx].external_heap_mrfd);
+        } else {
+            ext_heap_key = 2;
+        }
 
-    err = sprintf(ext_heap_key_name, "fi_ext_heap_key_%d", nic_idx);
-    if (err < 0) {
-        RAISE_ERROR_STR("sprintf failed - external heap key");
-    }
-    err = shmem_runtime_put(ext_heap_key_name, &ext_heap_key, sizeof(uint64_t));
-    if (err) {
-        RAISE_WARN_STR("Put of heap key to runtime KVS failed");
-        return 1;
-    }
+        err = sprintf(ext_heap_key_name, "fi_ext_heap_key_%zu", nic_idx);
+        if (err < 0) {
+            RAISE_ERROR_STR("sprintf failed - external heap key");
+        }
+        err = shmem_runtime_put(ext_heap_key_name, &ext_heap_key, sizeof(uint64_t));
+        if (err) {
+            RAISE_WARN_STR("Put of heap key to runtime KVS failed");
+            return 1;
+        }
 
-    void *ext_heap_base;
+        void *ext_heap_base;
 
-    if (info->domain_attr->mr_mode & FI_MR_VIRT_ADDR) {
-        ext_heap_base = shmem_external_heap_base;
-    } else {
-        ext_heap_base = (void *) 0;
-    }
+        if (info->domain_attr->mr_mode & FI_MR_VIRT_ADDR) {
+            ext_heap_base = shmem_external_heap_base;
+        } else {
+            ext_heap_base = (void *) 0;
+        }
 
-    err = sprintf(ext_heap_addr_name, "fi_ext_heap_addr_%d", nic_idx);
-    if (err < 0) {
-        RAISE_ERROR_STR("sprintf failed - external heap addr");
-    }
-    err = shmem_runtime_put(ext_heap_addr_name, &ext_heap_base, sizeof(uint8_t*));
-    if (err) {
-        RAISE_WARN_STR("Put of heap address to runtime KVS failed");
-        return 1;
+        err = sprintf(ext_heap_addr_name, "fi_ext_heap_addr_%zu", nic_idx);
+        if (err < 0) {
+            RAISE_ERROR_STR("sprintf failed - external heap addr");
+        }
+        err = shmem_runtime_put(ext_heap_addr_name, &ext_heap_base, sizeof(uint8_t*));
+        if (err) {
+            RAISE_WARN_STR("Put of heap address to runtime KVS failed");
+            return 1;
+        }
     }
 
     return 0;
@@ -882,7 +896,7 @@ int publish_external_mr_info(size_t nic_idx)
 #endif
 
 static
-int publish_mr_info()
+int publish_mr_info(void)
 {
     for (size_t nic_idx = 0; nic_idx < shmem_transport_ofi_num_nics; nic_idx++) {
         struct fi_info *info = provider_list[nic_idx];
@@ -890,9 +904,6 @@ int publish_mr_info()
         {
             int err;
             uint64_t heap_key, data_key;
-
-            shmem_transport_ofi_target_eps[nic_idx].heap_mrfd = (struct fid_mr**) malloc(sizeof(struct fid_mr*));
-            shmem_transport_ofi_target_eps[nic_idx].data_mrfd = (struct fid_mr**) malloc(sizeof(struct fid_mr*));
 
             char heap_key_name[32], data_key_name[32];
             if (info->domain_attr->mr_mode & FI_MR_PROV_KEY) {
@@ -903,7 +914,7 @@ int publish_mr_info()
                 data_key = 0;
             }
 
-            err = sprintf(heap_key_name, "fi_heap_key_%d", nic_idx);
+            err = sprintf(heap_key_name, "fi_heap_key_%zu", nic_idx);
             if (err < 0) {
                 RAISE_ERROR_STR("sprintf failed - heap key name");
             }
@@ -913,7 +924,7 @@ int publish_mr_info()
                 return 1;
             }
 
-            err = sprintf(data_key_name, "fi_data_key_%d", nic_idx);
+            err = sprintf(data_key_name, "fi_data_key_%zu", nic_idx);
             if (err < 0) {
                 RAISE_ERROR_STR("sprintf failed - data key name");
             }
@@ -943,7 +954,7 @@ int publish_mr_info()
                 data_base = (void *) 0;
             }
 
-            err = sprintf(heap_addr_name, "fi_heap_addr_%d", nic_idx);
+            err = sprintf(heap_addr_name, "fi_heap_addr_%zu", nic_idx);
             if (err < 0) {
                 RAISE_ERROR_STR("sprintf failed - heap addr");
             }
@@ -953,7 +964,7 @@ int publish_mr_info()
                 return 1;
             }
 
-            err = sprintf(data_addr_name, "fi_data_addr_%d", nic_idx);
+            err = sprintf(data_addr_name, "fi_data_addr_%zu", nic_idx);
             if (err < 0) {
                 RAISE_ERROR_STR("sprintf failed - data addr");
             }
@@ -965,57 +976,67 @@ int publish_mr_info()
         }
 #endif /* ENABLE_REMOTE_VIRTUAL_ADDRESSING */
 #endif /* !ENABLE_MR_SCALABLE */
+    }
 
 #ifdef USE_FI_HMEM
         if (shmem_external_heap_pre_initialized) {
-            int err = publish_external_mr_info(nic_idx);
+            int err = publish_external_mr_info();
             if (err) {
                 RAISE_WARN_STR("Publish of external mr info failed");
                 return 1;
             }
         }
 #endif
-    }
+
     return 0;
 }
 
 #ifdef USE_FI_HMEM
 static
-int populate_external_mr_tables(size_t nic_idx)
+int populate_external_mr_tables(void)
 {
-    int i, err;
+    int err;
 
-    shmem_transport_ofi_target_eps[nic_idx].external_heap_keys = malloc(sizeof(uint64_t) * shmem_internal_num_pes);
-    if (NULL == shmem_transport_ofi_target_eps[nic_idx].external_heap_keys) {
+    external_heap_keys = malloc(sizeof(uint64_t) * shmem_internal_num_pes * shmem_transport_ofi_num_nics);
+    if (NULL == external_heap_keys) {
         RAISE_WARN_STR("Out of memory allocating heap keytable");
         return 1;
     }
 
-    /* Called after the upper layer performs the runtime exchange */
-    for (i = 0; i < shmem_internal_num_pes; i++) {
-        err = shmem_runtime_get(i, "fi_ext_heap_key",
-                                &shmem_transport_ofi_target_eps[nic_idx].external_heap_keys[i],
-                                sizeof(uint64_t));
-        if (err) {
-            RAISE_WARN_STR("Get of heap key from runtime KVS failed");
-            return 1;
-        }
-    }
-
-    shmem_transport_ofi_target_eps[nic_idx].external_heap_addrs = malloc(sizeof(uint8_t*) * shmem_internal_num_pes);
-    if (NULL == shmem_transport_ofi_target_eps[nic_idx].external_heap_addrs) {
+    external_heap_addrs = malloc(sizeof(uint8_t*) * shmem_internal_num_pes * shmem_transport_ofi_num_nics);
+    if (NULL == external_heap_addrs) {
         RAISE_WARN_STR("Out of memory allocating heap addrtable");
         return 1;
     }
 
     /* Called after the upper layer performs the runtime exchange */
-    for (i = 0; i < shmem_internal_num_pes; i++) {
-        err = shmem_runtime_get(i, "fi_ext_heap_addr",
-                                &shmem_transport_ofi_target_eps[nic_idx].external_heap_addrs[i],
-                                sizeof(uint8_t*));
-        if (err) {
-            RAISE_WARN_STR("Get of heap address from runtime KVS failed");
-            return 1;
+    for (size_t i = 0; i < shmem_internal_num_pes; i++) {
+        for (size_t j = 0; j < shmem_transport_ofi_num_nics; j++) {
+            char ext_heap_key_name[32], ext_heap_addr_name[32];
+
+            err = sprintf(ext_heap_key_name, "fi_ext_heap_key_%zu", j);
+            if (err < 0) {
+                RAISE_ERROR_STR("sprintf failed - ext. heap key name");
+            }
+            err = shmem_runtime_get(i, ext_heap_key_name,
+                                    &external_heap_keys[(i * shmem_transport_ofi_num_nics) + j],
+                                    sizeof(uint64_t));
+            if (err) {
+                RAISE_WARN_STR("Get of heap key from runtime KVS failed");
+                return 1;
+            }
+
+            err = sprintf(ext_heap_addr_name, "fi_ext_heap_addr_%zu", j);
+            if (err < 0) {
+                RAISE_ERROR_STR("sprintf failed - ext. heap addr name");
+            }
+            err = shmem_runtime_get(i, ext_heap_addr_name,
+                                    &external_heap_addrs[(i * shmem_transport_ofi_num_nics) + j],
+                                    sizeof(uint8_t*));
+            if (err) {
+                RAISE_WARN_STR("Get of heap address from runtime KVS failed");
+                return 1;
+            }
         }
     }
 
@@ -1026,34 +1047,60 @@ int populate_external_mr_tables(size_t nic_idx)
 static
 int populate_mr_tables(void)
 {
-    for (size_t nic_idx = 0; nic_idx < shmem_transport_ofi_num_nics; nic_idx++) {
+#ifndef ENABLE_MR_SCALABLE
+    heap_keys = malloc(sizeof(uint64_t) * shmem_internal_num_pes * shmem_transport_ofi_num_nics);
+    if (NULL == heap_keys) {
+        RAISE_WARN_STR("Out of memory allocating heap keytable");
+        return 1;
+    }
+
+    data_keys = malloc(sizeof(uint64_t) * shmem_internal_num_pes * shmem_transport_ofi_num_nics);
+    if (NULL == data_keys) {
+        RAISE_WARN_STR("Out of memory allocating heap keytable");
+        return 1;
+    }
+#endif
+
+#ifndef ENABLE_REMOTE_VIRTUAL_ADDRESSING
+    heap_addrs = malloc(sizeof(uint8_t*) * shmem_internal_num_pes * shmem_transport_ofi_num_nics);
+    if (NULL == heap_addrs) {
+        RAISE_WARN_STR("Out of memory allocating heap addrtable");
+        return 1;
+    }
+
+    data_addrs = malloc(sizeof(uint8_t*) * shmem_internal_num_pes * shmem_transport_ofi_num_nics);
+    if (NULL == data_addrs) {
+        RAISE_WARN_STR("Out of memory allocating data addrtable");
+        return 1;
+    }
+#endif
+
+    int err;
+    for (size_t i = 0; i < shmem_internal_num_pes; i++) {
 #ifndef ENABLE_MR_SCALABLE
         {
-            int i, err;
-
-            shmem_transport_ofi_target_eps[nic_idx].heap_keys = malloc(sizeof(uint64_t) * shmem_internal_num_pes);
-            if (NULL == shmem_transport_ofi_target_eps[nic_idx].heap_keys) {
-                RAISE_WARN_STR("Out of memory allocating heap keytable");
-                return 1;
-            }
-
-            shmem_transport_ofi_target_eps[nic_idx].data_keys = malloc(sizeof(uint64_t) * shmem_internal_num_pes);
-            if (NULL == shmem_transport_ofi_target_eps[nic_idx].data_keys) {
-                RAISE_WARN_STR("Out of memory allocating heap keytable");
-                return 1;
-            }
-
             /* Called after the upper layer performs the runtime exchange */
-            for (i = 0; i < shmem_internal_num_pes * shmem_transport_ofi_num_nics; i++) {
-                err = shmem_runtime_get(i, "fi_heap_key",
-                                        &shmem_transport_ofi_target_eps[nic_idx].heap_keys[i],
+            for (size_t j = 0; j < shmem_transport_ofi_num_nics; j++) {
+                char heap_key_name[32], data_key_name[32];
+
+                err = sprintf(heap_key_name, "fi_heap_key_%zu", j);
+                if (err < 0) {
+                    RAISE_ERROR_STR("sprintf failed - heap key name");
+                }
+                err = shmem_runtime_get(i, heap_key_name,
+                                        &heap_keys[(i * shmem_transport_ofi_num_nics) + j],
                                         sizeof(uint64_t));
                 if (err) {
                     RAISE_WARN_STR("Get of heap key from runtime KVS failed");
                     return 1;
                 }
-                err = shmem_runtime_get(i, "fi_data_key",
-                                        &shmem_transport_ofi_target_eps[nic_idx].data_keys[i],
+
+                err = sprintf(data_key_name, "fi_data_key_%zu", j);
+                if (err < 0) {
+                    RAISE_ERROR_STR("sprintf failed - data key name");
+                }
+                err = shmem_runtime_get(i, data_key_name,
+                                        &data_keys[(i * shmem_transport_ofi_num_nics) + j],
                                         sizeof(uint64_t));
                 if (err) {
                     RAISE_WARN_STR("Get of data segment key from runtime KVS failed");
@@ -1064,31 +1111,28 @@ int populate_mr_tables(void)
 
 #ifndef ENABLE_REMOTE_VIRTUAL_ADDRESSING
         {
-            int i, err;
-
-            shmem_transport_ofi_target_eps[nic_idx].heap_addrs = malloc(sizeof(uint8_t*) * shmem_internal_num_pes);
-            if (NULL == shmem_transport_ofi_target_eps[nic_idx].heap_addrs) {
-                RAISE_WARN_STR("Out of memory allocating heap addrtable");
-                return 1;
-            }
-
-            shmem_transport_ofi_target_eps[nic_idx].data_addrs = malloc(sizeof(uint8_t*) * shmem_internal_num_pes);
-            if (NULL == shmem_transport_ofi_target_eps[nic_idx].data_addrs) {
-                RAISE_WARN_STR("Out of memory allocating data addrtable");
-                return 1;
-            }
-
             /* Called after the upper layer performs the runtime exchange */
-            for (i = 0; i < shmem_internal_num_pes; i++) {
-                err = shmem_runtime_get(i, "fi_heap_addr",
-                                        &shmem_transport_ofi_target_eps[nic_idx].heap_addrs[i],
+            for (size_t j = 0; j < shmem_transport_ofi_num_nics; j++) {
+                char heap_addr_name[32], data_addr_name[32];
+
+                err = sprintf(heap_addr_name, "fi_heap_addr_%zu", j);
+                if (err < 0) {
+                    RAISE_ERROR_STR("sprintf failed - heap addr");
+                }
+                err = shmem_runtime_get(i, heap_addr_name,
+                                        &heap_addrs[(i * shmem_transport_ofi_num_nics) + j],
                                         sizeof(uint8_t*));
                 if (err) {
                     RAISE_WARN_STR("Get of heap address from runtime KVS failed");
                     return 1;
                 }
-                err = shmem_runtime_get(i, "fi_data_addr",
-                                        &shmem_transport_ofi_target_eps[nic_idx].data_addrs[i],
+
+                err = sprintf(data_addr_name, "fi_data_addr_%zu", j);
+                if (err < 0) {
+                    RAISE_ERROR_STR("sprintf failed - data addr");
+                }
+                err = shmem_runtime_get(i, data_addr_name,
+                                        &data_addrs[(i * shmem_transport_ofi_num_nics) + j],
                                         sizeof(uint8_t*));
                 if (err) {
                     RAISE_WARN_STR("Get of data segment address from runtime KVS failed");
@@ -1098,17 +1142,18 @@ int populate_mr_tables(void)
         }
 #endif /* ENABLE_REMOTE_VIRTUAL_ADDRESSING */
 #endif /* !ENABLE_MR_SCALABLE */
+    }
 
 #ifdef USE_FI_HMEM
         if (shmem_external_heap_pre_initialized) {
-            int err = populate_external_mr_tables(nic_idx);
+            int err = populate_external_mr_tables();
             if (err) {
                 RAISE_WARN_STR("Populate external MR tables failed");
                 return 1;
             }
         }
 #endif
-    }
+
     return 0;
 }
 
@@ -1285,11 +1330,10 @@ int publish_av_info(struct fabric_info *info)
             return ret;
         }
 
-        err = sprintf(epname_key, "fi_epname_%d", nic_idx);
+        err = sprintf(epname_key, "fi_epname_%zu", nic_idx);
         if (err < 0) {
             RAISE_ERROR_STR("sprintf failed - epname");
         }
-        DEBUG_MSG("epname: %s\n", epname_key);
         ret = shmem_runtime_put(epname_key, epname, epnamelen);
         OFI_CHECK_RETURN_STR(ret, "shmem_runtime_put fi_epname failed");
     }
@@ -1308,7 +1352,7 @@ int populate_av()
     int    i, j, ret, err = 0;
     char   *alladdrs = NULL;
 
-    // Currently assuming all PEs hvae the same number of NICs (FIXME: This may not always be a reasonable assumption)
+    // Currently assuming all PEs have the same number of NICs (FIXME: This may not always be a reasonable assumption)
     alladdrs = malloc(shmem_internal_num_pes * shmem_transport_ofi_addrlen * shmem_transport_ofi_num_nics);
     if (alladdrs == NULL) {
         RAISE_WARN_STR("Out of memory allocating 'alladdrs'");
@@ -1325,7 +1369,7 @@ int populate_av()
                 RAISE_ERROR_STR("sprintf failed");
             }
 
-            err = shmem_runtime_get(i, /*"fi_epname"*/ epname_key, addr_ptr, shmem_transport_ofi_addrlen);
+            err = shmem_runtime_get(i, epname_key, addr_ptr, shmem_transport_ofi_addrlen);
             if (err != 0) {
                 RAISE_ERROR_STR("Runtime get of 'fi_epname' failed");
             }
@@ -1339,7 +1383,7 @@ int populate_av()
                            addr_table,
                            0,
                         NULL);
-        if (ret != shmem_internal_num_pes) {
+        if (ret != (shmem_internal_num_pes * shmem_transport_ofi_num_nics)) {
             RAISE_WARN_STR("av insert failed");
             return ret;
         }
@@ -1350,7 +1394,7 @@ int populate_av()
                            addr_table,
                            0,
                            NULL);
-        if (ret != shmem_internal_num_pes) {
+        if (ret != (shmem_internal_num_pes * shmem_transport_ofi_num_nics)) {
             RAISE_WARN_STR("av insert failed");
             return ret;
         }
@@ -1843,8 +1887,6 @@ static int shmem_transport_ofi_ctx_init(shmem_transport_ctx_t *ctx, int id)
      * so that they can be inserted back into to the free list. */
     struct fi_cq_attr cq_attr = {0};
     cq_attr.format = FI_CQ_FORMAT_CONTEXT;
-
-    struct fabric_info* info = &shmem_transport_ofi_info;
 
     ctx->id = id;
     ctx->fabric = (struct fid_fabric **) malloc(shmem_transport_ofi_num_nics * sizeof(struct fid_fabric *));
@@ -2370,6 +2412,20 @@ int shmem_transport_fini(void)
     }
     if (shmem_transport_ofi_stx_pool) free(shmem_transport_ofi_stx_pool);
 
+#if !defined(ENABLE_MR_SCALABLE)
+    free(heap_keys);
+    free(data_keys);
+#if !defined(ENABLE_REMOTE_VIRTUAL_ADDRESSING)
+    free(heap_addrs);
+    free(data_addrs);
+#endif
+#endif
+
+#ifdef USE_FI_HMEM
+    free(external_heap_keys);
+    free(external_heap_addrs);
+#endif
+
     for (size_t idx = 0; idx < shmem_transport_ofi_num_nics; idx++) {
 #if defined(ENABLE_MR_SCALABLE)
 #if defined(ENABLE_REMOTE_VIRTUAL_ADDRESSING)
@@ -2382,14 +2438,6 @@ int shmem_transport_fini(void)
         ret = fi_close(&shmem_transport_ofi_target_eps[nic_idx].data_mrfd->fid);
         OFI_CHECK_ERROR_MSG(ret, "Target data MR close failed (%s)\n", fi_strerror(errno));  
 #endif
-#else
-        free(shmem_transport_ofi_target_eps[idx].heap_keys);
-        free(shmem_transport_ofi_target_eps[idx].data_keys);
-
-#if !defined(ENABLE_REMOTE_VIRTUAL_ADDRESSING)
-        free(shmem_transport_ofi_target_eps[idx].heap_addrs);
-        free(shmem_transport_ofi_target_eps[idx].data_addrs);
-#endif
 
         ret = fi_close(&shmem_transport_ofi_target_eps[idx].heap_mrfd->fid);
         OFI_CHECK_ERROR_MSG(ret, "Target heap MR close failed (%s)\n", fi_strerror(errno));
@@ -2400,13 +2448,10 @@ int shmem_transport_fini(void)
 
 #ifdef USE_FI_HMEM
         if (shmem_external_heap_pre_initialized) {
-            free(shmem_transport_ofi_target_eps[idx].external_heap_keys);
-            free(shmem_transport_ofi_target_eps[idx].external_heap_addrs);
             ret = fi_close(&shmem_transport_ofi_target_eps[idx].external_heap_mrfd->fid);
             OFI_CHECK_ERROR_MSG(ret, "External heap MR close failed (%s)\n", fi_strerror(errno));
         }
 #endif
-
         ret = fi_close(&shmem_transport_ofi_target_eps[idx].ep->fid);
         OFI_CHECK_ERROR_MSG(ret, "Target endpoint close failed (%s)\n", fi_strerror(errno));
 
