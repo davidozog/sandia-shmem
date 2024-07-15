@@ -143,9 +143,16 @@ shmem_internal_shutdown(void)
         return;
     }
 
-    size_t nic_idx = 0;
-    SHMEM_GET_TRANSMIT_NIC_IDX(nic_idx);
-    shmem_internal_barrier_all(nic_idx);
+    //size_t nic_idx = 0;
+    //SHMEM_GET_TRANSMIT_NIC_IDX(nic_idx);
+    //shmem_internal_barrier_all(nic_idx);
+
+    DEBUG_MSG("aaa\n");
+    for (size_t nic_idx = 0; nic_idx < shmem_transport_ofi_num_nics; nic_idx++) {
+        DEBUG_MSG("ffffff\n");
+        shmem_internal_barrier_all(nic_idx);
+    }
+    DEBUG_MSG("bbb\n");
 
     shmem_internal_finalized = 1;
 

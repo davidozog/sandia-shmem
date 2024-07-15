@@ -99,24 +99,29 @@ shmem_internal_fence(shmem_ctx_t ctx)
 
 #define SHMEM_TEST(type, a, b, ret) COMP(type, SYNC_LOAD(a), b, ret)
 
-#define SHMEM_WAIT_POLL(var, value)                                             \
-    do {                                                                        \
-        while (SYNC_LOAD(var) == value) {                                       \
-            shmem_transport_probe();                                            \
-            SPINLOCK_BODY();                                                    \
-        }                                                                       \
+#define SHMEM_WAIT_POLL(var, value)                                                        \
+    do {                                                                                   \
+        while (SYNC_LOAD(var) == value) {                                                  \
+            for (size_t nic_idx = 0; nic_idx < shmem_transport_ofi_num_nics; nic_idx++)  { \
+                shmem_transport_probe(nic_idx);                                            \
+                SPINLOCK_BODY();                                                           \
+            }                                                                              \
+        }                                                                                  \
     } while(0)
 
-#define SHMEM_WAIT_UNTIL_POLL(var, cond, value)                                \
-    do {                                                                       \
-        int cmpret;                                                            \
-                                                                               \
-        COMP(cond, SYNC_LOAD(var), value, cmpret);                             \
-        while (!cmpret) {                                                      \
-            shmem_transport_probe();                                           \
-            SPINLOCK_BODY();                                                   \
-            COMP(cond, SYNC_LOAD(var), value, cmpret);                         \
-        }                                                                      \
+#define SHMEM_WAIT_UNTIL_POLL(var, cond, value)                                           \
+    do {                                                                                  \
+        int cmpret;                                                                       \
+                                                                                          \
+        COMP(cond, SYNC_LOAD(var), value, cmpret);                                        \
+        while (!cmpret) {                                                                 \
+            for (size_t nic_idx = 0; nic_idx < shmem_transport_ofi_num_nics; nic_idx++) { \
+                shmem_transport_probe(nic_idx);                                           \
+                SPINLOCK_BODY();                                                          \
+            }                                                                             \
+            COMP(cond, SYNC_LOAD(var), value, cmpret);                                    \
+            /*DEBUG_MSG("var: %d, value: %d, cmpret: %d\n", SYNC_LOAD(var), value, cmpret);*/ \
+        }                                                                                 \
     } while(0)
 
 #define SHMEM_SIGNAL_WAIT_UNTIL_POLL(var, cond, value, sat_value)                         \
@@ -125,8 +130,10 @@ shmem_internal_fence(shmem_ctx_t ctx)
                                                                                           \
         COMP_SIGNAL(cond, SYNC_LOAD(var), value, cmpret, sat_value);                      \
         while (!cmpret) {                                                                 \
-            shmem_transport_probe();                                                      \
-            SPINLOCK_BODY();                                                              \
+            for (size_t nic_idx = 0; nic_idx < shmem_transport_ofi_num_nics; nic_idx++) { \
+                shmem_transport_probe(nic_idx);                                           \
+                SPINLOCK_BODY();                                                          \
+            }                                                                             \
             COMP_SIGNAL(cond, SYNC_LOAD(var), value, cmpret, sat_value);                  \
         }                                                                                 \
     } while(0)
@@ -205,7 +212,9 @@ shmem_internal_fence(shmem_ctx_t ctx)
     } while (0)
 
 #define SHMEM_WAIT_UNTIL(var, cond, value) do {                         \
+        DEBUG_MSG("AAA\n"); \
         SHMEM_INTERNAL_WAIT_UNTIL(var, cond, value);                    \
+        DEBUG_MSG("BBB\n"); \
         shmem_internal_membar_acq_rel();                                \
         shmem_transport_syncmem();                                      \
     } while (0)
