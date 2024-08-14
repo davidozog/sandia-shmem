@@ -120,7 +120,6 @@ shmem_internal_fence(shmem_ctx_t ctx)
                 SPINLOCK_BODY();                                                          \
             }                                                                             \
             COMP(cond, SYNC_LOAD(var), value, cmpret);                                    \
-            /*DEBUG_MSG("var: %d, value: %d, cmpret: %d\n", SYNC_LOAD(var), value, cmpret);*/ \
         }                                                                                 \
     } while(0)
 
@@ -212,9 +211,7 @@ shmem_internal_fence(shmem_ctx_t ctx)
     } while (0)
 
 #define SHMEM_WAIT_UNTIL(var, cond, value) do {                         \
-        DEBUG_MSG("AAA\n"); \
         SHMEM_INTERNAL_WAIT_UNTIL(var, cond, value);                    \
-        DEBUG_MSG("BBB\n"); \
         shmem_internal_membar_acq_rel();                                \
         shmem_transport_syncmem();                                      \
     } while (0)

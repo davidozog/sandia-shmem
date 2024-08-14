@@ -339,9 +339,9 @@ typedef enum fi_op       shm_internal_op_t;
 extern fi_addr_t *addr_table;
 
 #ifdef USE_AV_MAP
-#define GET_DEST(dest) ((fi_addr_t)(addr_table[(dest)]))
+#define GET_DEST(dest) ((fi_addr_t)(addr_table[(dest * shmem_transport_ofi_num_nics)]))
 #else
-#define GET_DEST(dest) ((fi_addr_t)(dest))
+#define GET_DEST(dest) ((fi_addr_t)(dest * shmem_transport_ofi_num_nics))
 #endif
 
 #ifdef USE_FI_HMEM
@@ -457,7 +457,6 @@ void shmem_transport_probe(size_t nic_idx)
     if (0 == pthread_mutex_trylock(&shmem_transport_ofi_progress_lock)) {
 #  endif
         struct fi_cq_entry buf;
-        //int ret = fi_cq_read(shmem_transport_ctx_default.cq[nic_idx], &buf, 1);
         int ret = fi_cq_read(shmem_transport_ofi_target_eps[nic_idx].cq, &buf, 1);
         if (ret == 1)
             RAISE_WARN_STR("Unexpected event");
@@ -578,7 +577,6 @@ void shmem_transport_put_quiet(shmem_transport_ctx_t* ctx, size_t nic_idx)
     long poll_count = 0;
     while (poll_count < shmem_transport_ofi_put_poll_limit ||
            shmem_transport_ofi_put_poll_limit < 0) {
-
         success = fi_cntr_read(ctx->put_cntr[nic_idx]); /* FIXED? */
         fail = fi_cntr_readerr(ctx->put_cntr[nic_idx]); /* FIXED? */
         cnt = SHMEM_TRANSPORT_OFI_CNTR_READ(&ctx->pending_put_cntr[nic_idx]); /* FIXED? */
@@ -818,7 +816,7 @@ void shmem_transport_put_signal_nbi(shmem_transport_ctx_t* ctx, void *target, co
         uint8_t *src_buf = (uint8_t *) source;
 
         SHMEM_TRANSPORT_OFI_CTX_LOCK(ctx);
-        SHMEM_TRANSPORT_OFI_CNTR_INC(&ctx->pending_put_cntr);
+        SHMEM_TRANSPORT_OFI_CNTR_INC(&ctx->pending_put_cntr[nic_idx]); /* FIXED? */
 
         const struct iovec msg_iov = {
                                        .iov_base = src_buf,

@@ -606,7 +606,6 @@ static inline
 int bind_enable_ep_resources(shmem_transport_ctx_t *ctx, size_t idx)
 {
     int ret = 0;
-
     /* If using SOS-managed STXs, bind the STX */
     if (ctx->stx_idx[idx] >= 0) {
         ret = fi_ep_bind(ctx->ep[idx], &shmem_transport_ofi_stx_pool[idx][ctx->stx_idx[idx]].stx->fid, 0);
@@ -1364,11 +1363,10 @@ int populate_av()
         for (j = 0; j < shmem_transport_ofi_num_nics; j++) {
             char *addr_ptr = alladdrs + (i * (shmem_transport_ofi_addrlen * shmem_transport_ofi_num_nics) + (j * shmem_transport_ofi_addrlen));
 
-            err = sprintf(epname_key, "fi_epname_%d", i);
+            err = sprintf(epname_key, "fi_epname_%d", j);
             if (err < 0) {
                 RAISE_ERROR_STR("sprintf failed");
             }
-
             err = shmem_runtime_get(i, epname_key, addr_ptr, shmem_transport_ofi_addrlen);
             if (err != 0) {
                 RAISE_ERROR_STR("Runtime get of 'fi_epname' failed");
@@ -2429,13 +2427,13 @@ int shmem_transport_fini(void)
     for (size_t idx = 0; idx < shmem_transport_ofi_num_nics; idx++) {
 #if defined(ENABLE_MR_SCALABLE)
 #if defined(ENABLE_REMOTE_VIRTUAL_ADDRESSING)
-        ret = fi_close(&shmem_transport_ofi_target_eps[nic_idx].mrfd->fid);
+        ret = fi_close(&shmem_transport_ofi_target_eps[idx].mrfd->fid);
         OFI_CHECK_ERROR_MSG(ret, "Target MR close failed (%s)\n", fi_strerror(errno));
 #else
-        ret = fi_close(&shmem_transport_ofi_target_eps[nic_idx].heap_mrfd->fid);
+        ret = fi_close(&shmem_transport_ofi_target_eps[idx].heap_mrfd->fid);
         OFI_CHECK_ERROR_MSG(ret, "Target heap MR close failed (%s)\n", fi_strerror(errno));
 
-        ret = fi_close(&shmem_transport_ofi_target_eps[nic_idx].data_mrfd->fid);
+        ret = fi_close(&shmem_transport_ofi_target_eps[idx].data_mrfd->fid);
         OFI_CHECK_ERROR_MSG(ret, "Target data MR close failed (%s)\n", fi_strerror(errno));  
 #endif
 
@@ -2452,6 +2450,7 @@ int shmem_transport_fini(void)
             OFI_CHECK_ERROR_MSG(ret, "External heap MR close failed (%s)\n", fi_strerror(errno));
         }
 #endif
+    } for (size_t idx = 0; idx < shmem_transport_ofi_num_nics; idx++) {
         ret = fi_close(&shmem_transport_ofi_target_eps[idx].ep->fid);
         OFI_CHECK_ERROR_MSG(ret, "Target endpoint close failed (%s)\n", fi_strerror(errno));
 
