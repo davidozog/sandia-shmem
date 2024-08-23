@@ -46,7 +46,9 @@ struct shmem_transport_ofi_target_ep {
     struct fid_domain*              domainfd;
     struct fid_av*                  avfd;
     struct fid_ep*                  ep;
+    #if ENABLE_MANUAL_PROGRESS
     struct fid_cq*                  cq;
+    #endif
     #if ENABLE_TARGET_CNTR
     struct fid_cntr*                cntrfd;
     #endif
@@ -153,21 +155,21 @@ extern pthread_mutex_t                  shmem_transport_ofi_progress_lock;
         }                                                                       \
     } while (0)
 
-#define OFI_CTX_CHECK_ERROR(ctx, /* ssize_t */ err)                             \
-    do {                                                                        \
-        if ((err) == -FI_EAVAIL) {                                              \
-            struct fi_cq_err_entry e = {0};                                     \
-            ssize_t ret = fi_cq_readerr((ctx)->cq, (void *)&e, 0); /* FIX */    \
-            if (ret == 1) {                                                     \
-                const char *errmsg = fi_cq_strerror((ctx)->cq /* FIX */, e.prov_errno,    \
-                                                    e.err_data, NULL, 0);       \
-                RAISE_ERROR_MSG("Error in operation: %s\n", errmsg);            \
-            } else {                                                            \
-                RAISE_ERROR_MSG("Error reading from CQ (%zd)\n", ret);          \
-            }                                                                   \
-        } else if (err) {                                                       \
-            RAISE_ERROR_MSG("OFI error %zd: %s\n", err, fi_strerror(err));      \
-        }                                                                       \
+#define OFI_CTX_CHECK_ERROR(ctx, nic_idx, /* ssize_t */ err)                                         \
+    do {                                                                                             \
+        if ((err) == -FI_EAVAIL) {                                                                   \
+            struct fi_cq_err_entry e = {0};                                                          \
+            ssize_t ret = fi_cq_readerr((ctx)->cq[nic_idx], (void *)&e, 0); /* FIXED */              \
+            if (ret == 1) {                                                                          \
+                const char *errmsg = fi_cq_strerror((ctx)->cq[nic_idx] /* FIXED */, e.prov_errno,    \
+                                                    e.err_data, NULL, 0);                            \
+                RAISE_ERROR_MSG("Error in operation: %s\n", errmsg);                                 \
+            } else {                                                                                 \
+                RAISE_ERROR_MSG("Error reading from CQ (%zd)\n", ret);                               \
+            }                                                                                        \
+        } else if (err) {                                                                            \
+            RAISE_ERROR_MSG("OFI error %zd: %s\n", err, fi_strerror(err));                           \
+        }                                                                                            \
     } while (0)
 
 #define OFI_CHECK_ERROR_MSG(ret, ...)                                           \
@@ -506,7 +508,7 @@ void shmem_transport_ofi_drain_cq(shmem_transport_ctx_t *ctx, size_t nic_idx)
         }
 
         else if (ret < 0) {
-            OFI_CTX_CHECK_ERROR(ctx, ret);
+            OFI_CTX_CHECK_ERROR(ctx, nic_idx, ret);
         }
 
         else {
@@ -600,7 +602,7 @@ void shmem_transport_put_quiet(shmem_transport_ctx_t* ctx, size_t nic_idx)
         cnt = cnt_new;
         ssize_t ret = fi_cntr_wait(ctx->put_cntr[nic_idx], cnt, -1); /* FIXED? */
         cnt_new = SHMEM_TRANSPORT_OFI_CNTR_READ(&ctx->pending_put_cntr[nic_idx]); /* FIXED? */
-        OFI_CTX_CHECK_ERROR(ctx, ret);
+        OFI_CTX_CHECK_ERROR(ctx, nic_idx, ret);
     } while (cnt < cnt_new);
     shmem_internal_assert(cnt == cnt_new);
 
@@ -673,7 +675,7 @@ int try_again(shmem_transport_ctx_t *ctx, const int ret, uint64_t *polled, size_
             }
         }
         else {
-            OFI_CTX_CHECK_ERROR(ctx, (ssize_t) ret);
+            OFI_CTX_CHECK_ERROR(ctx, nic_idx, (ssize_t) ret);
         }
     }
 
@@ -1066,7 +1068,7 @@ void shmem_transport_get_wait(shmem_transport_ctx_t* ctx, size_t nic_idx)
         cnt = cnt_new;
         ssize_t ret = fi_cntr_wait(ctx->get_cntr[nic_idx], cnt, -1);
         cnt_new = SHMEM_TRANSPORT_OFI_CNTR_READ(&ctx->pending_get_cntr[nic_idx]);
-        OFI_CTX_CHECK_ERROR(ctx, ret);
+        OFI_CTX_CHECK_ERROR(ctx, nic_idx, ret);
     } while (cnt < cnt_new);
     shmem_internal_assert(cnt == cnt_new);
 
