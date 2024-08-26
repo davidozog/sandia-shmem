@@ -2436,7 +2436,7 @@ int shmem_transport_fini(void)
         ret = fi_close(&shmem_transport_ofi_target_eps[idx].data_mrfd->fid);
         OFI_CHECK_ERROR_MSG(ret, "Target data MR close failed (%s)\n", fi_strerror(errno));  
 #endif
-
+#else
         ret = fi_close(&shmem_transport_ofi_target_eps[idx].heap_mrfd->fid);
         OFI_CHECK_ERROR_MSG(ret, "Target heap MR close failed (%s)\n", fi_strerror(errno));
 
