@@ -252,7 +252,7 @@ shmem_transport_put_scalar(shmem_transport_ctx_t* ctx, void *target, const void 
 static inline
 void
 shmem_transport_put_nb(shmem_transport_ctx_t* ctx, void *target, const void *source, size_t len,
-                       int pe, long *completion)
+                       int pe, long *completion, size_t nic_idx)
 {
     ucs_status_t status;
     ucp_rkey_h rkey;
@@ -520,7 +520,7 @@ shmem_transport_atomic(shmem_transport_ctx_t* ctx, void *target, const void *sou
 static inline
 void
 shmem_transport_atomicv(shmem_transport_ctx_t* ctx, void *target, const void *source, size_t len,
-                        int pe, shm_internal_op_t op, shm_internal_datatype_t datatype, long *completion)
+                        int pe, shm_internal_op_t op, shm_internal_datatype_t datatype, long *completion, size_t nic_idx)
 {
     /* Used only by reductions, currently redirected to softwre reductions via
      * the shmem_transport_atomic_supported query below. */
@@ -690,11 +690,11 @@ shmem_transport_mswap(shmem_transport_ctx_t* ctx, void *target, const void *sour
     while (!done) {
         uint32_t v;
 
-        shmem_transport_atomic_fetch(ctx, &v, target, len, pe, datatype);
+        shmem_transport_atomic_fetch(ctx, &v, target, len, pe, datatype, nic_idx);
 
         uint32_t new = (v & ~*(uint32_t *)mask) | (*(uint32_t *)source & *(uint32_t *)mask);
 
-        shmem_transport_cswap(ctx, target, &new, dest, &v, len, pe, datatype);
+        shmem_transport_cswap(ctx, target, &new, dest, &v, len, pe, datatype, nic_idx);
         if (*(uint32_t *)dest == v) done = 1;
 
         /* Manual progress to avoid deadlock for application-level polling */
