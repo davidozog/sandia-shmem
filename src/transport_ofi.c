@@ -2075,9 +2075,8 @@ int shmem_transport_ctx_create(struct shmem_internal_team_t *team, long options,
         id = team->contexts_len;
 
         size_t i = team->contexts_len;
-        team->contexts = realloc(team->contexts, (i + shmem_transport_ofi_grow_size) *
-                                                  sizeof(shmem_transport_ctx_t*));
         team->contexts_len += shmem_transport_ofi_grow_size;
+        team->contexts = realloc(team->contexts, team->contexts_len * sizeof(shmem_transport_ctx_t*));
 
         if (team->contexts == NULL) {
             RAISE_ERROR_STR("Out of memory when allocating OFI ctx array");
@@ -2252,7 +2251,8 @@ int shmem_transport_fini(void)
     }
     OFI_CHECK_ERROR_MSG(ret, "Progress thread join returned (%d)\n", ret);
 
-#if defined(ENABLE_MR_SCALABLE) && defined(ENABLE_REMOTE_VIRTUAL_ADDRESSING)
+#if defined(ENABLE_MR_SCALABLE)
+#if defined(ENABLE_REMOTE_VIRTUAL_ADDRESSING)
     ret = fi_close(&shmem_transport_ofi_target_mrfd->fid);
     OFI_CHECK_ERROR_MSG(ret, "Target MR close failed (%s)\n", fi_strerror(errno));
 #else
@@ -2260,7 +2260,7 @@ int shmem_transport_fini(void)
     OFI_CHECK_ERROR_MSG(ret, "Target heap MR close failed (%s)\n", fi_strerror(errno));
 
     ret = fi_close(&shmem_transport_ofi_target_data_mrfd->fid);
-    OFI_CHECK_ERROR_MSG(ret, "Target data MR close failed (%s)\n", fi_strerror(errno));  
+    OFI_CHECK_ERROR_MSG(ret, "Target data MR close failed (%s)\n", fi_strerror(errno));
 #endif
 #else
     free(shmem_transport_ofi_target_heap_keys);
