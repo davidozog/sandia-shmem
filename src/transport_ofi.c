@@ -206,28 +206,28 @@ void shmem_transport_full_probe(void)
 #  ifdef USE_THREAD_COMPLETION
     if (0 == pthread_mutex_trylock(&shmem_transport_ofi_progress_lock)) {
 #  endif
-        for (long i = 0; i < shmem_internal_params.TEAMS_MAX; i++) {
-            if (shmem_internal_team_pool[i] != NULL) {
-                for (int j = 0; j < shmem_internal_team_pool[i]->contexts_len; j++) {
-                    if (shmem_internal_team_pool[i]->contexts[j] != NULL) {
-                        struct fi_cq_entry buf;
-                        if (!shmem_internal_team_pool[i]->contexts[j]->options & SHMEM_CTX_PRIVATE) {
-                            int ret = fi_cq_read(shmem_internal_team_pool[i]->contexts[j]->cq, &buf, 1);
-                            if (ret == 1)
-                                RAISE_WARN_STR("Unexpected event");
-                        }
-                    }
-                }
-            }
-        }
+        //for (long i = 0; i < shmem_internal_params.TEAMS_MAX; i++) {
+        //    if (shmem_internal_team_pool[i] != NULL) {
+        //        for (int j = 0; j < shmem_internal_team_pool[i]->contexts_len; j++) {
+        //            if (shmem_internal_team_pool[i]->contexts[j] != NULL) {
+        //                struct fi_cq_entry buf;
+        //                if (!shmem_internal_team_pool[i]->contexts[j]->options & SHMEM_CTX_PRIVATE) {
+        //                    int ret = fi_cq_read(shmem_internal_team_pool[i]->contexts[j]->cq, &buf, 1);
+        //                    if (ret == 1)
+        //                        RAISE_WARN_STR("Unexpected event");
+        //                }
+        //            }
+        //        }
+        //    }
+        //}
         struct fi_cq_entry buf;
         int ret = fi_cq_read(shmem_transport_ofi_target_cq, &buf, 1);
         if (ret == 1)
-            RAISE_WARN_STR("Unexpected event");
+            RAISE_WARN_STR("Unexpected event (target cq)");
 
-        ret = fi_cq_read(shmem_transport_ctx_default.cq, &buf, 1);
-        if (ret == 1)
-            RAISE_WARN_STR("Unexpected event");
+        //ret = fi_cq_read(shmem_transport_ctx_default.cq, &buf, 1);
+        //if (ret == 1)
+        //    RAISE_WARN_STR("Unexpected event (default ctx cq)");
 
 #  ifdef USE_THREAD_COMPLETION
         pthread_mutex_unlock(&shmem_transport_ofi_progress_lock);
@@ -2245,11 +2245,11 @@ int shmem_transport_fini(void)
     }
     if (shmem_transport_ofi_stx_pool) free(shmem_transport_ofi_stx_pool);
 
-    if (shmem_internal_params.PROGRESS_INTERVAL > 0) {
-        __atomic_store_n(&shmem_transport_ofi_progress_thread_enabled, 0, __ATOMIC_RELEASE);
-        pthread_join(shmem_transport_ofi_progress_thread, NULL);
-    }
-    OFI_CHECK_ERROR_MSG(ret, "Progress thread join returned (%d)\n", ret);
+    //if (shmem_internal_params.PROGRESS_INTERVAL > 0) {
+    //    __atomic_store_n(&shmem_transport_ofi_progress_thread_enabled, 0, __ATOMIC_RELEASE);
+    //    pthread_join(shmem_transport_ofi_progress_thread, NULL);
+    //}
+    //OFI_CHECK_ERROR_MSG(ret, "Progress thread join returned (%d)\n", ret);
 
 #if defined(ENABLE_MR_SCALABLE)
 #if defined(ENABLE_REMOTE_VIRTUAL_ADDRESSING)
