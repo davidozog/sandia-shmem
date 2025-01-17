@@ -1,0 +1,53 @@
+The shmem_perf_plot tool
+------------------------
+
+Script for graphing plots from the Sandia OpenSHMEM (SOS) Perf Suite
+located in <SOS_repo_path>/test/performance/shmem_perf_suite.
+
+Usage:
+```
+shmem_perf_plot.py [-h] [--title TITLE] --input FILENAME [FILENAME ...]
+
+options:
+  -h, --help 
+        Show this help message and exit
+  --input FILENAME [FILENAME ...], -i FILENAME [FILENAME ...]
+        The list of log filenames to read and plot (required)
+  --title TITLE, -t TITLE
+        A string for the title of the generated plot (optional)
+  --maximum, -m
+        Only plot the maximum (y-value) across all input files (optional)
+  --csv, -c
+        Read simple CSV files with the -i flag (optional)
+  --message-rate, -r
+        Plot message rate instead of throughput (optional)
+  --dpi DPI, -d DPI
+        The dots per inch (DPI) of the generated plot
+```
+
+The script assumes each data file passed to `--input` or `-i` includes the
+standard output from a clean and consistent run of a shmem_perf_suite test.
+An example input file is included in `put_perf_output_example.txt`
+
+The plot is generated into `plot.png` and will be overwritten by a subsequent
+execution of the script.  You've been warned!
+
+The plot legend includes the filenames of each input data file.  If ---maximum
+is passed, then the plot legend includes only the filename of the first data
+file passed to --input.
+
+The tool generates CSV files with the parsed values used to generate the plots.
+The format of these filenames are "generated_<input_filename>.csv" where
+<input_filename> represents the name of each file passed to --input.  If
+--maximum is passed, the output filenames is "generated_MAX.csv".
+
+This script currently works only with put, get, and non-blocking put/get
+tests, only for the default message sizes, and only the bandwidth
+measurement.  Any other settings that change the default output formatting
+may not work with this tool.
+
+Requirements:
+
+python 3.6+
+matplotlib
+numpy

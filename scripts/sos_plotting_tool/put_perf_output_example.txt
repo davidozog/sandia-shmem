@@ -1,0 +1,38 @@
+
+                    Sandia OpenSHMEM Performance Suite
+                    ==================================
+Total Number of PEs:             2      Window size:                    64
+Number of source PEs:            1      Maximum message size:      8388608
+Number of target PEs:            1      Number of threads:               1
+Iteration count:              1000      Thread safety:              SINGLE
+
+
+
+Bandwidth test type:       Uni-dir
+
+Message Size               Bandwidth               Message Rate
+    in bytes           in mbytes/sec                in msgs/sec
+           1                    0.10                   95789.14
+           2                    0.16                   79990.77
+           4                    0.33                   82639.84
+           8                    0.74                   92086.15
+          16                    1.49                   92874.29
+          32                    2.61                   81646.16
+          64                    4.96                   77573.44
+         128                    9.85                   76949.24
+         256                   18.96                   74079.15
+         512                   36.82                   71912.73
+        1024                   47.48                   46369.09
+        2048                   90.39                   44136.90
+        4096                   66.05                   16125.02
+        8192                  132.03                   16117.43
+       16384                  188.66                   11515.03
+       32768                  340.71                   10397.74
+       65536                  783.57                   11956.27
+      131072                 1191.33                    9089.16
+      262144                 2215.35                    8450.87
+      524288                 4129.72                    7876.81
+     1048576                 5773.63                    5506.16
+     2097152                 5985.06                    2853.90
+     4194304                 7103.93                    1693.71
+     8388608                 6923.50                     825.35
