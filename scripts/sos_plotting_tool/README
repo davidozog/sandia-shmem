@@ -9,7 +9,7 @@ Usage:
 shmem_perf_plot.py [-h] [--title TITLE] --input FILENAME [FILENAME ...]
 
 options:
-  -h, --help 
+  -h, --help
         Show this help message and exit
   --input FILENAME [FILENAME ...], -i FILENAME [FILENAME ...]
         The list of log filenames to read and plot (required)
