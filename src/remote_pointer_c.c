@@ -57,7 +57,7 @@ shmem_team_ptr(shmem_team_t team, const void *target, int pe)
         return NULL;
     }
 
-    int global_pe = shmem_team_translate_pe(team, pe, SHMEM_TEAM_WORLD);
+    int global_pe = shmem_internal_team_translate_pe((shmem_internal_team_t *)team, pe, &shmem_internal_team_world);
 
     return shmem_internal_ptr(target, global_pe);
 }
