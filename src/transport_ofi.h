@@ -15,6 +15,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/uio.h>
+#include <sys/types.h>
+#include <string.h>
+#include <unistd.h>
+#include <stddef.h>
+#include <inttypes.h>
+
 #include <rdma/fabric.h>
 #include <rdma/fi_errno.h>
 #include <rdma/fi_domain.h>
@@ -23,15 +29,15 @@
 #include <rdma/fi_rma.h>
 #include <rdma/fi_cm.h>
 #include <rdma/fi_atomic.h>
-#include <string.h>
-#include <unistd.h>
-#include <stddef.h>
-#include <inttypes.h>
+#include <rdma/fi_collective.h>
+
+typedef struct fid_mc* shmem_transport_group_t;
+typedef struct fid_av_set* shmem_transport_set_t;
+
 #include "shmem_free_list.h"
 #include "shmem_internal.h"
 #include "shmem_atomic.h"
 #include "shmem_team.h"
-#include <sys/types.h>
 
 
 #if !defined(ENABLE_HARD_POLLING)
@@ -73,6 +79,8 @@ extern long                             shmem_transport_ofi_max_bounce_buffers;
 
 extern pthread_mutex_t                  shmem_transport_ofi_progress_lock;
 
+/* Set via environment variables: */
+extern int shmem_transport_collectives;
 extern int shmem_transport_ofi_single_ep;
 
 #ifndef MIN
@@ -387,7 +395,7 @@ void shmem_transport_probe(void)
 #  ifdef USE_THREAD_COMPLETION
     if (0 == pthread_mutex_trylock(&shmem_transport_ofi_progress_lock)) {
 #  endif
-        struct fi_cq_entry buf;
+        struct fi_cq_entry buf = {0};
         /* Do not read a CQ entry in single-endpoint mode, just make progress. */
         /* The target EP and default ctx share resources, so a CQ entry is valid */
         int ret = fi_cq_read(shmem_transport_ofi_target_cq, (void *)&buf,
@@ -420,7 +428,7 @@ static inline
 void shmem_transport_ofi_drain_cq(shmem_transport_ctx_t *ctx)
 {
     ssize_t ret = 0;
-    struct fi_cq_entry buf;
+    struct fi_cq_entry buf = {0};
 
     for (;;) {
         ret = fi_cq_read(ctx->cq, (void *)&buf, 1);
@@ -562,6 +570,36 @@ int shmem_transport_fence(shmem_transport_ctx_t* ctx)
 
     return 0;
 }
+
+#if ENABLE_MANUAL_PROGRESS
+static inline
+int wait_for_comp(void *ctx)
+{
+    struct fi_cq_err_entry comp = {0};
+    int err;
+
+    do {
+        err = fi_cq_read(shmem_transport_ofi_target_cq, &comp, 1);
+        if (err < 0 && err != -FI_EAGAIN)
+            return err;
+        if (comp.op_context && comp.op_context == ctx)
+            return 0;
+    } while (err == -FI_EAGAIN);
+
+    return 0;
+}
+#endif
+
+/* Must be called only by PEs in this team (i.e., not the parent team) */
+int shmem_transport_collective_group_init(struct shmem_internal_team_t *team);
+int shmem_transport_collective_group_fini(struct shmem_internal_team_t *team);
+
+/* Collective operations */
+int shmem_transport_sync(struct shmem_internal_team_t *team);
+int shmem_transport_sync_all(void);
+void shmem_transport_broadcast(struct shmem_internal_team_t *team, void *dest,
+                               const void *source, size_t nelems, int PE_root,
+                               int datatype);
 
 
 /* Process RMA operation return code.  If libfabric returned -FI_EAGAIN, attempt

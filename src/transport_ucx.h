@@ -35,6 +35,49 @@ enum shm_internal_op_t {
  * shmem_transport_atomic_supported routine below. */
 #define SHMEM_TRANSPORT_UCX_OP_LAST SHM_INTERNAL_SUM
 
+static int shmem_transport_collectives = 0;
+typedef int shmem_transport_group_t;
+typedef int shmem_transport_set_t;
+
+#include "shmem_team.h"
+
+static inline
+int shmem_transport_collective_group_init(struct shmem_internal_team_t *team)
+{
+    RAISE_ERROR_STR("No path to peer");
+    return ENOSYS;
+}
+
+static inline
+int shmem_transport_collective_group_fini(struct shmem_internal_team_t *team)
+{
+    RAISE_ERROR_STR("No path to peer");
+    return ENOSYS;
+}
+
+static inline
+int shmem_transport_sync(struct shmem_internal_team_t *team)
+{
+    RAISE_ERROR_STR("No path to peer");
+    return ENOSYS;
+}
+
+static inline
+int shmem_transport_sync_all(void)
+{
+    RAISE_ERROR_STR("No path to peer");
+    return ENOSYS;
+}
+
+static inline
+void shmem_transport_broadcast(struct shmem_internal_team_t *team, void *dest,
+                               const void *source, size_t nelems, int PE_root,
+                               int datatype)
+{
+    RAISE_ERROR_STR("No path to peer");
+    return;
+}
+
 extern ucp_atomic_post_op_t shmem_transport_ucx_post_op[];
 extern ucp_atomic_fetch_op_t shmem_transport_ucx_fetch_op[];
 

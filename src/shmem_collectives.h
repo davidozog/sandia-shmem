@@ -18,7 +18,6 @@
 
 #include "shmem_synchronization.h"
 
-
 enum coll_type_t {
     AUTO = 0,
     LINEAR,
@@ -106,7 +105,12 @@ void
 shmem_internal_barrier_all(void)
 {
     shmem_internal_quiet(SHMEM_CTX_DEFAULT);
-    shmem_internal_sync(0, 1, shmem_internal_num_pes, shmem_internal_barrier_all_psync);
+
+    if (shmem_transport_collectives) {
+        shmem_transport_sync_all();
+    } else {
+        shmem_internal_sync(0, 1, shmem_internal_num_pes, shmem_internal_barrier_all_psync);
+    }
 }
 
 

@@ -3,7 +3,7 @@ Sandia OpenSHMEM
 
 * About
 
-Sandia OpenSHMEM is an implementation of the OpenSHMEM specification over
+Sandia OpenSHMEM (SOS) is an implementation of the OpenSHMEM specification over
 Portals 4.0, the Open Fabrics Interface (OFI), and XPMEM.
 
 Please refer to the "tests-sos" repository (https://github.com/openshmem-org/tests-sos)
@@ -94,7 +94,10 @@ Options to configure include:
                           in slightly higher overhead than "yes", but
                           will provide a fallback if the network
                           doesn't provide total data ordering.
-
+  --enable-ofi-collectives
+                          Permanently enable OFI libfabric FI_COLLECTIVE
+                          implementations of the OpenSHMEM collective
+                          operations in the SOS library.
 
 There are many other options to configure to influence performance and
 behavior.  See 'configure --help' for documentation on available
@@ -271,6 +274,15 @@ options.
         are merged to conserve context resources.  Regardless of this
         parameter, each PE consumes another endpoint for each OpenSHMEM user
         context that is created.
+
+    SHMEM_OFI_ENABLE_COLLECTIVES (default: off)
+        Setting this (to any value) enables and prefers OFI libfabric
+        FI_COLLECTIVE implementations for OpenSHMEM collective operations.
+        Currently only shmem_barrier_all(), shmem_sync_all(), shmem_sync(), and
+        shmem_broadcast() are supported.  Teams with negative strides are not
+        supported and fallback to the standard implementation. If SOS is
+        configured with --enable-ofi-collectives, the feature is permanently
+        enabled and this environment variable has no effect.
 
   Team Environment variables:
 

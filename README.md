@@ -5,7 +5,7 @@
 
 ## About
 
-Sandia OpenSHMEM is an implementation of the OpenSHMEM specification over
+Sandia OpenSHMEM (SOS) is an implementation of the OpenSHMEM specification over
 Portals 4.0, the Open Fabrics Interface (OFI), and XPMEM.
 
 Please refer to the [`tests-sos` repository](https://github.com/openshmem-org/tests-sos)

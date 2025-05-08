@@ -61,9 +61,15 @@ struct fabric_info {
     int npes;
 };
 
+struct fi_eq_attr eq_attr = {
+    .wait_obj = FI_WAIT_UNSPEC
+};
+struct fid_eq*                  shmem_transport_ofi_eq;
+
 struct fid_fabric*              shmem_transport_ofi_fabfd;
 struct fid_domain*              shmem_transport_ofi_domainfd;
 struct fid_av*                  shmem_transport_ofi_avfd;
+struct fid_av_set*              shmem_transport_ofi_av_set_world;
 struct fid_ep*                  shmem_transport_ofi_target_ep;
 struct fid_cq*                  shmem_transport_ofi_target_cq;
 #if ENABLE_TARGET_CNTR
@@ -115,6 +121,7 @@ pthread_mutex_t                 shmem_transport_ofi_progress_lock = PTHREAD_MUTE
 #endif /* ENABLE_THREADS */
 
 int shmem_transport_ofi_single_ep;
+int shmem_transport_collectives;
 
 /* Temporarily redefine SHM_INTERNAL integer types to their FI counterparts to
  * translate the DTYPE_* types (defined by autoconf according to system ABI)
@@ -1321,6 +1328,9 @@ int allocate_fabric_resources(struct fabric_info *info)
     ret = fi_fabric(info->p_info->fabric_attr, &shmem_transport_ofi_fabfd, NULL);
     OFI_CHECK_RETURN_STR(ret, "fabric initialization failed");
 
+    ret = fi_eq_open(shmem_transport_ofi_fabfd, &eq_attr, &shmem_transport_ofi_eq, NULL);
+    OFI_CHECK_RETURN_STR(ret, "event queue initialization failed");
+
     DEBUG_MSG("OFI version: built %"PRIu32".%"PRIu32", cur. %"PRIu32".%"PRIu32"; "
               "provider version: %"PRIu32".%"PRIu32"\n",
               FI_MAJOR_VERSION, FI_MINOR_VERSION,
@@ -1338,7 +1348,7 @@ int allocate_fabric_resources(struct fabric_info *info)
     /* access domain: define communication resource limits/boundary within
      * fabric domain */
     ret = fi_domain(shmem_transport_ofi_fabfd, info->p_info,
-                    &shmem_transport_ofi_domainfd,NULL);
+                    &shmem_transport_ofi_domainfd, NULL);
     OFI_CHECK_RETURN_STR(ret, "domain initialization failed");
 
     /* AV table set-up for PE mapping */
@@ -1488,6 +1498,8 @@ int query_for_fabric(struct fabric_info *info)
 #ifdef USE_FI_HMEM
     hints.caps |= FI_HMEM;
 #endif
+    if (shmem_transport_collectives)
+        hints.caps |= FI_COLLECTIVE;
     hints.addr_format         = FI_FORMAT_UNSPEC;
 #ifdef ENABLE_FI_MANUAL_PROGRESS
     domain_attr.data_progress = FI_PROGRESS_MANUAL;
@@ -1685,6 +1697,9 @@ static int shmem_transport_ofi_target_ep_init(void)
     if (shmem_transport_ofi_single_ep) {
         info->p_info->caps |= FI_WRITE | FI_READ | FI_RECV;
     }
+    if (shmem_transport_collectives) {
+        info->p_info->caps |= FI_COLLECTIVE;
+    }
 #if ENABLE_TARGET_CNTR
     info->p_info->caps |= FI_RMA_EVENT;
 #endif
@@ -1698,6 +1713,10 @@ static int shmem_transport_ofi_target_ep_init(void)
     ret = fi_endpoint(shmem_transport_ofi_domainfd,
                       info->p_info, &shmem_transport_ofi_target_ep, NULL);
     OFI_CHECK_RETURN_MSG(ret, "target endpoint creation failed (%s)\n", fi_strerror(errno));
+
+    /* Attach the eq */
+    ret = fi_ep_bind(shmem_transport_ofi_target_ep, &shmem_transport_ofi_eq->fid, 0);
+    OFI_CHECK_RETURN_STR(ret, "fi_ep_bind eq to target endpoint failed");
 
     /* Attach the address vector */
     ret = fi_ep_bind(shmem_transport_ofi_target_ep, &shmem_transport_ofi_avfd->fid, 0);
@@ -1759,6 +1778,10 @@ static int shmem_transport_ofi_ctx_init(shmem_transport_ctx_t *ctx, int id)
     info->p_info->rx_attr->mode = 0;
     info->p_info->tx_attr->caps = info->p_info->caps;
     info->p_info->rx_attr->caps = FI_RECV; /* to drive progress on the CQ */;
+
+    if (shmem_transport_collectives) {
+        info->p_info->caps |= FI_COLLECTIVE;
+    }
 
     ctx->id = id;
 #ifdef USE_CTX_LOCK
@@ -1848,6 +1871,18 @@ int shmem_transport_init(void)
     else
         shmem_transport_ofi_single_ep = 1;
 
+    /* If the USE_FI_COLLECTIVE macro or the SHMEM_OFI_ENABLE_COLLECTIVES env var is set, prefer
+     * the FI_COLLECTIVE implementations and fallback to psync-based routines for unsupported
+     * operations and/or negative team strides */
+#if USE_FI_COLLECTIVE
+    shmem_transport_collectives = 1;
+#else
+    if (shmem_internal_params.OFI_ENABLE_COLLECTIVES_provided)
+        shmem_transport_collectives = 1;
+    else
+        shmem_transport_collectives = 0;
+#endif
+
     /* Check STX resource settings */
     if ((shmem_internal_thread_level == SHMEM_THREAD_SINGLE ||
          shmem_internal_thread_level == SHMEM_THREAD_FUNNELED ) &&
@@ -1926,6 +1961,105 @@ int shmem_transport_init(void)
     if (ret != 0) return ret;
 
     return 0;
+}
+
+static inline
+int wait_for_event(uint32_t event, const void *context)
+{
+    uint32_t ev;
+    int ret;
+    struct fi_eq_entry entry;
+
+    do {
+        ret = fi_eq_read(shmem_transport_ofi_eq, &ev, &entry, sizeof(entry), 0);
+        if (ret >= 0) {
+            DEBUG_MSG("found eq entry %d\n", ev);
+            if (ev == event) {
+                if (!context || (entry.context == context))
+                    return 0;
+                else if (context)
+                    return -FI_EOTHER;
+            }
+        } else if (ret != -FI_EAGAIN) {
+            return ret;
+        }
+
+    shmem_transport_probe();
+    shmem_transport_ofi_drain_cq(&shmem_transport_ctx_default);
+
+    } while (ret == -FI_EAGAIN);
+
+    return ret;
+}
+
+/* Must be called only by PEs in this team (i.e., not the parent team) */
+int shmem_transport_collective_group_init(struct shmem_internal_team_t *team)
+{
+
+    fi_addr_t fi_addr;
+    struct fi_av_set_attr av_set_attr;
+    struct fid_av_set *av_set = {0};
+    struct fid_mc *multicast_group = {0};
+
+    av_set_attr.count = team->size;
+#ifdef USE_AV_MAP
+    av_set_attr.start_addr = FI_ADDR_NOTAVAIL;
+    av_set_attr.end_addr = FI_ADDR_NOTAVAIL;
+    av_set_attr.stride = 0;
+#else
+    /* fi_av_set objects cannot have negative strides - this affects group_fini() below */
+    if (team->stride < 0) {
+        RAISE_WARN_STR("OFI collectives do not yet support negative strides\n");
+        return -1;
+    }
+    av_set_attr.start_addr = team->start;
+    av_set_attr.end_addr = team->start + team->stride * (team->size - 1);
+    av_set_attr.stride = team->stride;
+#endif
+
+    uint64_t done_flag;
+
+    int ret = fi_av_set(shmem_transport_ofi_avfd, &av_set_attr, &av_set, NULL);
+    if (ret != FI_SUCCESS) {
+        RETURN_ERROR_MSG("fi_av_set failed in transport collectives startup (%d)\n", ret);
+        return ret;
+    }
+
+    ret = fi_av_set_addr(av_set, &fi_addr);
+    if (ret != FI_SUCCESS) {
+        RETURN_ERROR_MSG("fi_av_set_addr failed in transport collectives startup (%d)\n", ret);
+        return ret;
+    }
+
+    ret = fi_join_collective(shmem_transport_ofi_target_ep, fi_addr,
+                             av_set, 0, &multicast_group, &done_flag);
+    if (ret) {
+        RETURN_ERROR_MSG("fi_join_collective failed in transport collectives startup (%d)\n", ret);
+        return ret;
+    }
+
+    team->set = av_set;
+    team->group = multicast_group;
+
+    return wait_for_event(FI_JOIN_COMPLETE, &done_flag);
+}
+
+/* Must be called only by PEs in this team (i.e., not the parent team) */
+int shmem_transport_collective_group_fini(struct shmem_internal_team_t *team)
+{
+    int ret = 0;
+
+    /* fi_av_set objects cannot have negative strides, so group_init() above
+     * might not have opened any set/group objects */
+    if (team->stride >= 0) {
+        ret = fi_close(&team->group->fid);
+        OFI_CHECK_ERROR_MSG(ret, "team group close failed (%s)\n", fi_strerror(errno));
+
+        ret = fi_close(&team->set->fid);
+        OFI_CHECK_ERROR_MSG(ret, "team set close failed (%s)\n", fi_strerror(errno));
+    }
+
+    return ret;
 }
 
 int shmem_transport_startup(void)
@@ -2070,6 +2204,76 @@ int shmem_transport_ctx_create(struct shmem_internal_team_t *team, long options,
     return ret;
 
 }
+
+int shmem_transport_sync(struct shmem_internal_team_t *team)
+{
+    uint64_t done_flag;
+    int ret;
+
+    fi_addr_t coll_addr = fi_mc_addr(team->group);
+
+    ret = fi_barrier(shmem_transport_ofi_target_ep, coll_addr, &done_flag);
+    if (ret) {
+        RETURN_ERROR_MSG("fi_barrier (shmem_sync) failed (%d)", ret);
+        return ret;
+    }
+
+#if ENABLE_MANUAL_PROGRESS
+    return wait_for_comp(&done_flag);
+#endif
+
+  return 0;
+}
+
+int shmem_transport_sync_all(void)
+{
+    uint64_t done_flag;
+    int ret;
+
+    fi_addr_t coll_addr = fi_mc_addr(shmem_internal_team_world.group);
+
+    ret = fi_barrier(shmem_transport_ofi_target_ep, coll_addr, &done_flag);
+    if (ret) {
+        RETURN_ERROR_MSG("fi_barrier (shmem_sync_all) failed (%d)", ret);
+        return ret;
+    }
+
+#if ENABLE_MANUAL_PROGRESS
+    return wait_for_comp(&done_flag);
+#endif
+
+  return 0;
+}
+
+void shmem_transport_broadcast(struct shmem_internal_team_t *team, void *dest,
+                                   const void *source, size_t len, int PE_root,
+                                   int datatype)
+{
+    uint64_t done_flag;
+    fi_addr_t root = PE_root;
+    int err;
+
+    if (len == 0) return;
+
+    fi_addr_t coll_addr = fi_mc_addr(team->group);
+    err = fi_broadcast(shmem_transport_ofi_target_ep, dest, len, NULL,
+                       coll_addr, root, SHMEM_TRANSPORT_DTYPE(datatype), 0, &done_flag);
+    if (err) {
+        RETURN_ERROR_MSG("fi_broadcast failed (%d)", err);
+        return;
+    }
+
+#if ENABLE_MANUAL_PROGRESS
+    err = wait_for_comp(&done_flag);
+    if (err) {
+        RETURN_ERROR_MSG("fi_broadcast completion failed (%d)", err);
+        return;
+    }
+#endif
+
+    return;
+}
+
 
 void shmem_transport_ctx_destroy(shmem_transport_ctx_t *ctx)
 {
@@ -2262,6 +2466,9 @@ int shmem_transport_fini(void)
 
     ret = fi_close(&shmem_transport_ofi_avfd->fid);
     OFI_CHECK_ERROR_MSG(ret, "AV close failed (%s)\n", fi_strerror(errno));
+
+    ret = fi_close(&shmem_transport_ofi_eq->fid);
+    OFI_CHECK_ERROR_MSG(ret, "Event queue close failed (%s)\n", fi_strerror(errno));
 
     ret = fi_close(&shmem_transport_ofi_domainfd->fid);
     OFI_CHECK_ERROR_MSG(ret, "Domain close failed (%s)\n", fi_strerror(errno));

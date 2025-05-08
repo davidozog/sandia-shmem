@@ -168,6 +168,33 @@ int shmem_internal_team_init(void)
               shmem_internal_team_node.start, shmem_internal_team_node.stride,
               shmem_internal_team_node.size);
 
+    if (shmem_transport_collectives) {
+        int ret = shmem_transport_collective_group_init(&shmem_internal_team_world);
+        if (ret != 0) {
+            RETURN_ERROR_MSG("Creation of SHMEM_TEAM_WORLD collective group/set failed (%d)",
+                             ret);
+            goto cleanup;
+        }
+
+        if (shmem_internal_team_shared.my_pe != -1) {
+            ret = shmem_transport_collective_group_init(&shmem_internal_team_shared);
+            if (ret != 0) {
+                RETURN_ERROR_MSG("Creation of SHMEM_TEAM_SHARED collective group/set failed (%d)",
+                                 ret);
+                goto cleanup;
+            }
+        }
+
+        if (shmem_internal_team_node.my_pe != -1) {
+            ret = shmem_transport_collective_group_init(&shmem_internal_team_node);
+            if (ret != 0) {
+                RETURN_ERROR_MSG("Creation of SHMEMX_TEAM_NODE collective group/set failed (%d)",
+                                 ret);
+                goto cleanup;
+            }
+        }
+    }
+
     if (shmem_internal_params.TEAMS_MAX > N_PSYNC_BYTES * CHAR_BIT) {
         RETURN_ERROR_MSG("Requested %ld teams, but only %d are supported\n",
                          shmem_internal_params.TEAMS_MAX, N_PSYNC_BYTES * CHAR_BIT);
@@ -401,6 +428,13 @@ int shmem_internal_team_split_strided(shmem_internal_team_t *parent_team, int PE
             *new_team = myteam;
 
             shmem_internal_team_pool[myteam->psync_idx] = *new_team;
+
+            if (shmem_transport_collectives) {
+                int ret = shmem_transport_collective_group_init(myteam);
+                if (ret != 0) {
+                    RAISE_WARN_MSG("Creation of transport collective group/set failed (%d)", ret);
+                }
+            }
         }
     }
 
@@ -526,6 +560,10 @@ void shmem_internal_team_destroy(shmem_internal_team_t *team)
     }
     shmem_internal_team_pool[team->psync_idx] = NULL;
     free(team->contexts);
+
+    if (shmem_transport_collectives) {
+        shmem_transport_collective_group_fini(team);
+    }
 
     if (team != &shmem_internal_team_world && team != &shmem_internal_team_shared &&
         team != &shmem_internal_team_node) {

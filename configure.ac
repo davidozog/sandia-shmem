@@ -340,6 +340,12 @@ AC_ARG_ENABLE([ofi-hmem],
 AS_IF([test "$enable_ofi_hmem" = "yes"],
       [AC_DEFINE([USE_FI_HMEM], [1], [If defined, the OFI transport will enable FI_HMEM.])])
 
+AC_ARG_ENABLE([ofi-collectives],
+    [AS_HELP_STRING([--enable-ofi-collectives],
+                    [Use FI_COLLECTIVE to enable select collective operations. (default: disabled)])])
+AS_IF([test "$enable_ofi_collectives" = "yes"],
+      [AC_DEFINE([USE_FI_COLLECTIVE], [1], [If defined, the OFI transport will enable FI_COLLECTIVE.])])
+
 PKG_INSTALLDIR()
 
 dnl check for programs

@@ -26,6 +26,8 @@ struct shmem_internal_team_t {
     long                           config_mask;
     size_t                         contexts_len;
     struct shmem_transport_ctx_t **contexts;
+    shmem_transport_set_t          set;
+    shmem_transport_group_t        group;
 };
 typedef struct shmem_internal_team_t shmem_internal_team_t;
 
@@ -81,4 +83,4 @@ int shmem_internal_team_pe(shmem_internal_team_t *team, int pe)
     return team->start + team->stride * pe;
 }
 
-#endif
+#endif /* SHMEM_TEAM_H */

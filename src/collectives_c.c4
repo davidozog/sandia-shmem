@@ -190,7 +190,10 @@ shmem_sync_all(void)
 {
     SHMEM_ERR_CHECK_INITIALIZED();
 
-    shmem_internal_sync_all();
+    if (shmem_transport_collectives)
+        shmem_transport_sync_all();
+    else
+        shmem_internal_sync_all();
 }
 
 void SHMEM_FUNCTION_ATTRIBUTES
@@ -212,9 +215,13 @@ shmem_team_sync(shmem_team_t team)
     SHMEM_ERR_CHECK_TEAM_VALID(team);
 
     shmem_internal_team_t *myteam = (shmem_internal_team_t *)team;
-    long *psync = shmem_internal_team_choose_psync(myteam, SYNC);
-    shmem_internal_sync(myteam->start, myteam->stride, myteam->size, psync);
-    shmem_internal_team_release_psyncs(myteam, SYNC);
+    if (shmem_transport_collectives && myteam->stride >= 0) {
+        shmem_transport_sync(myteam);
+    } else {
+        long *psync = shmem_internal_team_choose_psync(myteam, SYNC);
+        shmem_internal_sync(myteam->start, myteam->stride, myteam->size, psync);
+        shmem_internal_team_release_psyncs(myteam, SYNC);
+    }
     return 0;
 }
 
@@ -388,18 +395,23 @@ shmem_broadcastmem(shmem_team_t team, void *dest, const void *source,
     SHMEM_ERR_CHECK_OVERLAP(dest, source, nelems, nelems, 1, 1);
 
     shmem_internal_team_t *myteam = (shmem_internal_team_t *)team;
-    long *psync = shmem_internal_team_choose_psync(myteam, BCAST);
-    shmem_internal_bcast(dest, source, nelems, PE_root, myteam->start,
-                         myteam->stride, myteam->size,
-                         psync, 1);
-    shmem_internal_team_release_psyncs(myteam, BCAST);
     int team_root = myteam->start + PE_root * myteam->stride;
     if (shmem_internal_my_pe == team_root && dest != source)
         shmem_internal_copy_self(dest, source, nelems);
+    if (shmem_transport_collectives && myteam->stride >= 0) {
+        shmem_transport_broadcast(myteam, dest, source, nelems, PE_root,
+                                  SHM_INTERNAL_UINT8);
+    } else {
+        long *psync = shmem_internal_team_choose_psync(myteam, BCAST);
+        shmem_internal_bcast(dest, source, nelems, PE_root, myteam->start,
+                             myteam->stride, myteam->size,
+                             psync, 1);
+        shmem_internal_team_release_psyncs(myteam, BCAST);
+    }
     return 0;
 }
 
-#define SHMEM_DEF_BCAST(STYPE,TYPE)                                     \
+#define SHMEM_DEF_BCAST(STYPE,TYPE,ITYPE)                               \
     int SHMEM_FUNCTION_ATTRIBUTES                                       \
     shmem_##STYPE##_broadcast(shmem_team_t team, TYPE *dest,            \
                               const TYPE *source, size_t nelems,        \
@@ -414,20 +426,27 @@ shmem_broadcastmem(shmem_team_t team, void *dest, const void *source,
                                 nelems * sizeof(TYPE), 1, 1);           \
                                                                         \
         shmem_internal_team_t *myteam = (shmem_internal_team_t *)team;  \
-        long *psync = shmem_internal_team_choose_psync(myteam, BCAST);  \
-        shmem_internal_bcast(dest, source, nelems * sizeof(TYPE),       \
-                             PE_root, myteam->start, myteam->stride,    \
-                             myteam->size, psync, 1);                   \
-        shmem_internal_team_release_psyncs(myteam, BCAST);              \
         int team_root = myteam->start + PE_root * myteam->stride;       \
         if (shmem_internal_my_pe == team_root && dest != source) {      \
             shmem_internal_copy_self(dest, source,                      \
                                      nelems * sizeof(TYPE));            \
         }                                                               \
+        if (shmem_transport_collectives && myteam->stride >= 0) {       \
+            shmem_transport_broadcast(myteam, dest, source,             \
+                                      nelems, PE_root, ITYPE);          \
+        } else {                                                        \
+            long *psync = shmem_internal_team_choose_psync(myteam,      \
+                                                           BCAST);      \
+            shmem_internal_bcast(dest, source, nelems * sizeof(TYPE),   \
+                                 PE_root, myteam->start, myteam->stride,\
+                                 myteam->size, psync, 1);               \
+            shmem_internal_team_release_psyncs(myteam, BCAST);          \
+        }                                                               \
         return 0;                                                       \
     }
 
-SHMEM_BIND_C_RMA(`SHMEM_DEF_BCAST')
+SHMEM_BIND_C_RMA_COLL(`SHMEM_DEF_BCAST')
+
 
 void SHMEM_FUNCTION_ATTRIBUTES
 shmem_collect32(void *target, const void *source, size_t nlong,

@@ -33,6 +33,36 @@ $1(uint64,     uint64_t)$2
 $1(size,       size_t)$2
 $1(ptrdiff,    ptrdiff_t)')dnl
 dnl
+dnl SHMEM_BIND_C_RMA_COLL below needs to mirror SHMEM_BIND_C_RMA above.
+dnl The two might be unifiable, but that is a pervasive change throughout
+dnl the RMA m4 interfaces, which do not require the internal datatype.
+dnl
+define(`SHMEM_BIND_C_RMA_COLL', dnl args: macro_name, end
+`$1(float,     float,              `SHM_INTERNAL_FLOAT')$2
+$1(double,     double,             `SHM_INTERNAL_DOUBLE')$2
+$1(longdouble, long double,        `SHM_INTERNAL_LONG_DOUBLE')$2
+$1(char,       char,               `SHM_INTERNAL_CHAR')$2
+$1(schar,      signed char,        `SHM_INTERNAL_SCHAR')$2
+$1(short,      short,              `SHM_INTERNAL_SHORT')$2
+$1(int,        int,                `SHM_INTERNAL_INT')$2
+$1(long,       long,               `SHM_INTERNAL_LONG')$2
+$1(longlong,   long long,          `SHM_INTERNAL_LONG_LONG')$2
+$1(uchar,      unsigned char,      `SHM_INTERNAL_UCHAR')$2
+$1(ushort,     unsigned short,     `SHM_INTERNAL_USHORT')$2
+$1(uint,       unsigned int,       `SHM_INTERNAL_UINT')$2
+$1(ulong,      unsigned long,      `SHM_INTERNAL_ULONG')$2
+$1(ulonglong,  unsigned long long, `SHM_INTERNAL_ULONG_LONG')$2
+$1(int8,       int8_t,             `SHM_INTERNAL_INT8')$2
+$1(int16,      int16_t,            `SHM_INTERNAL_INT16')$2
+$1(int32,      int32_t,            `SHM_INTERNAL_INT32')$2
+$1(int64,      int64_t,            `SHM_INTERNAL_INT64')$2
+$1(uint8,      uint8_t,            `SHM_INTERNAL_UINT8')$2
+$1(uint16,     uint16_t,           `SHM_INTERNAL_UINT16')$2
+$1(uint32,     uint32_t,           `SHM_INTERNAL_UINT32')$2
+$1(uint64,     uint64_t,           `SHM_INTERNAL_UINT64')$2
+$1(size,       size_t,             `SHM_INTERNAL_SIZE_T')$2
+$1(ptrdiff,    ptrdiff_t,          `SHM_INTERNAL_PTRDIFF_T')')dnl
+dnl
 define(`SHMEM_BIND_C_SIZES', dnl args: macro_name, end
 `$1(8,          1)$2
 $1(16,         2)$2

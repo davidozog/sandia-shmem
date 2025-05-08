@@ -20,6 +20,9 @@
 #include "shmem_internal.h"
 #include "transport.h"
 
+int shmem_transport_collectives = 0;
+typedef int shmem_transport_group_t = 0;
+typedef int shmem_transport_set_t = 0;
 
 /* Operations */
 enum shm_internal_op_t {
