@@ -28,16 +28,19 @@ jobs:
         include:
           - config_name: PMI simple
             sos_config: --enable-pmi-simple
-            libfabric_version: v1.7.x
-          - config_name: PMI simple
-            sos_config: --enable-pmi-simple
             libfabric_version: v1.9.x
           - config_name: PMI simple
             sos_config: --enable-pmi-simple
-            libfabric_version: v1.11.x
+            libfabric_version: v1.13.x
           - config_name: PMI simple
             sos_config: --enable-pmi-simple
-            libfabric_version: v1.13.x
+            libfabric_version: v1.17.x
+          - config_name: PMI simple
+            sos_config: --enable-pmi-simple
+            libfabric_version: v1.21.x
+          - config_name: PMI simple
+            sos_config: --enable-pmi-simple
+            libfabric_version: v2.1.x
           - config_name: PMI simple
             sos_config: --enable-pmi-simple
             libfabric_version: v2.1.x
@@ -66,15 +69,16 @@ jobs:
           #              --enable-pmi-simple
           #  libfabric_version: v2.1.x
           - config_name: XPMEM RVA
+            env_setup: export SHMEM_OFI_PROVIDER="sockets";
             xpmem_version: master
             sos_config: --with-xpmem=${XPMEM_INSTALL_DIR} --enable-error-checking
                         --enable-remote-virtual-addressing --enable-pmi-simple
             libfabric_version: v2.1.x
-          - config_name: XPMEM shared atomics
+          - config_name: XPMEM TCP;RXM
+            env_setup: export SHMEM_OFI_PROVIDER="tcp;ofi_rxm";
             xpmem_version: master
-            sos_config: --with-xpmem=${XPMEM_INSTALL_DIR} --enable-shr-atomics
+            sos_config: --with-xpmem=${XPMEM_INSTALL_DIR}
                         --enable-error-checking --enable-pmi-simple
-            libfabric_version: v2.1.x
           - config_name: RVA, thread completion
             sos_config: --enable-error-checking --enable-remote-virtual-addressing
                         --enable-thread-completion --enable-pmi-simple
@@ -154,6 +158,12 @@ jobs:
           - config_name: Without Non-fetch AMO
             sos_config: --disable-nonfetch-amo --enable-pmi-simple
             libfabric_version: v2.1.x
+          - config_name: OFI Collectives
+            # The sockets provider does not support FI_COLLECTIVE:
+            env_setup: export SHMEM_OFI_PROVIDER="tcp;ofi_rxm"
+            sos_config: --enable-hard-polling --enable-manual-progress
+                        --enable-ofi-manual-progress --enable-ofi-collectives --enable-pmi-simple
+            libfabric_version: v2.1.x
                      
     name: OFI ${{ matrix.libfabric_version }} (${{ matrix.config_name }})
 
@@ -213,6 +223,8 @@ jobs:
         if: ${{ matrix.xpmem_version }}
         uses: actions/checkout@v4
         with:
+          # The openucx fork of xpmem diverged from hpc/xpmem, but resolves a critical
+          # build issue on Ubuntu 24.04 (see https://github.com/openucx/xpmem/issues/51)
           repository: openucx/xpmem
           path: repos/xpmem
           ref: ${{ matrix.xpmem_version }}
