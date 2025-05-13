@@ -1,4 +1,4 @@
 [submodule "modules/tests-sos"]
 	path = modules/tests-sos
-	url = ../../openshmem-org/tests-sos.git
-	branch = main
+	url = ../../davidozog/tests-sos.git
+	branch = pr/bcast_flood_to_lengthy
