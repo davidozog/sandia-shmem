@@ -2245,7 +2245,7 @@ int shmem_transport_sync_all(void)
   return 0;
 }
 
-void shmem_transport_broadcast(struct shmem_internal_team_t *team, void *dest,
+int shmem_transport_broadcast(struct shmem_internal_team_t *team, void *dest,
                                    const void *source, size_t len, int PE_root,
                                    int datatype)
 {
@@ -2253,25 +2253,25 @@ void shmem_transport_broadcast(struct shmem_internal_team_t *team, void *dest,
     fi_addr_t root = PE_root;
     int err;
 
-    if (len == 0) return;
+    if (len == 0) return 0;
 
     fi_addr_t coll_addr = fi_mc_addr(team->group);
     err = fi_broadcast(shmem_transport_ofi_target_ep, dest, len, NULL,
                        coll_addr, root, SHMEM_TRANSPORT_DTYPE(datatype), 0, &done_flag);
     if (err) {
         RETURN_ERROR_MSG("fi_broadcast failed (%d)", err);
-        return;
+        return err;
     }
 
 #if ENABLE_MANUAL_PROGRESS
     err = wait_for_comp(&done_flag);
     if (err) {
         RETURN_ERROR_MSG("fi_broadcast completion failed (%d)", err);
-        return;
+        return err;
     }
 #endif
 
-    return;
+    return 0;
 }
 
 

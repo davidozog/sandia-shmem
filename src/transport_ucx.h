@@ -13,11 +13,14 @@
 #define TRANSPORT_UCX_H
 
 #include <string.h>
-#include "shmem_internal.h"
-#include "transport.h"
+#include <errno.h>
+
 #include <ucs/type/status.h>
 #include <ucp/api/ucp_def.h>
 #include <ucp/api/ucp.h>
+
+#include "shmem_internal.h"
+#include "transport.h"
 
 /* Operations */
 enum shm_internal_op_t {
@@ -35,47 +38,47 @@ enum shm_internal_op_t {
  * shmem_transport_atomic_supported routine below. */
 #define SHMEM_TRANSPORT_UCX_OP_LAST SHM_INTERNAL_SUM
 
-static int shmem_transport_collectives = 0;
+extern int shmem_transport_collectives;
 typedef int shmem_transport_group_t;
 typedef int shmem_transport_set_t;
 
 #include "shmem_team.h"
+typedef struct shmem_internal_team_t shmem_internal_team_t;
 
 static inline
 int shmem_transport_collective_group_init(struct shmem_internal_team_t *team)
 {
-    RAISE_ERROR_STR("No path to peer");
-    return ENOSYS;
+    RETURN_ERROR_STR("No path to peer");
+    return ENOTSUP;
 }
 
 static inline
 int shmem_transport_collective_group_fini(struct shmem_internal_team_t *team)
 {
-    RAISE_ERROR_STR("No path to peer");
-    return ENOSYS;
+    RETURN_ERROR_STR("No path to peer");
+    return ENOTSUP;
 }
-
 static inline
 int shmem_transport_sync(struct shmem_internal_team_t *team)
 {
-    RAISE_ERROR_STR("No path to peer");
-    return ENOSYS;
+    RETURN_ERROR_STR("No path to peer");
+    return ENOTSUP;
 }
 
 static inline
 int shmem_transport_sync_all(void)
 {
-    RAISE_ERROR_STR("No path to peer");
-    return ENOSYS;
+    RETURN_ERROR_STR("No path to peer");
+    return ENOTSUP;
 }
 
 static inline
-void shmem_transport_broadcast(struct shmem_internal_team_t *team, void *dest,
+int shmem_transport_broadcast(struct shmem_internal_team_t *team, void *dest,
                                const void *source, size_t nelems, int PE_root,
                                int datatype)
 {
-    RAISE_ERROR_STR("No path to peer");
-    return;
+    RETURN_ERROR_STR("No path to peer");
+    return ENOTSUP;
 }
 
 extern ucp_atomic_post_op_t shmem_transport_ucx_post_op[];

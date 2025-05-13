@@ -16,6 +16,8 @@
 shmem_transport_ctx_t shmem_transport_ctx_default;
 shmem_ctx_t SHMEM_CTX_DEFAULT = (shmem_ctx_t) &shmem_transport_ctx_default;
 
+int shmem_transport_collectives = 0;
+
 int shmem_transport_init(void)
 {
     shmem_transport_ctx_default.options = 0;

@@ -597,9 +597,9 @@ int shmem_transport_collective_group_fini(struct shmem_internal_team_t *team);
 /* Collective operations */
 int shmem_transport_sync(struct shmem_internal_team_t *team);
 int shmem_transport_sync_all(void);
-void shmem_transport_broadcast(struct shmem_internal_team_t *team, void *dest,
-                               const void *source, size_t nelems, int PE_root,
-                               int datatype);
+int shmem_transport_broadcast(struct shmem_internal_team_t *team, void *dest,
+                              const void *source, size_t nelems, int PE_root,
+                              int datatype);
 
 
 /* Process RMA operation return code.  If libfabric returned -FI_EAGAIN, attempt

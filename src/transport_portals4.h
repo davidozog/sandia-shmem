@@ -21,57 +21,58 @@
 #include <string.h>
 #include <stdint.h>
 #include <inttypes.h>
+#include <errno.h>
 
 #include "shmem_free_list.h"
 #include "shmem_internal.h"
 #include "shmem_atomic.h"
-#include "shmem_team.h"
 
 #ifndef MIN
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #endif
 
-static int shmem_transport_collectives = 0;
+extern int shmem_transport_collectives;
 typedef int shmem_transport_group_t;
 typedef int shmem_transport_set_t;
 
 #include "shmem_team.h"
+typedef struct shmem_internal_team_t shmem_internal_team_t;
 
 static inline
 int shmem_transport_collective_group_init(struct shmem_internal_team_t *team)
 {
-    RAISE_ERROR_STR("No path to peer");
-    return ENOSYS;
+    RETURN_ERROR_STR("No path to peer");
+    return ENOTSUP;
 }
 
 static inline
 int shmem_transport_collective_group_fini(struct shmem_internal_team_t *team)
 {
-    RAISE_ERROR_STR("No path to peer");
-    return ENOSYS;
+    RETURN_ERROR_STR("No path to peer");
+    return ENOTSUP;
 }
 
 static inline
 int shmem_transport_sync(struct shmem_internal_team_t *team)
 {
-    RAISE_ERROR_STR("No path to peer");
-    return ENOSYS;
+    RETURN_ERROR_STR("No path to peer");
+    return ENOTSUP;
 }
 
 static inline
 int shmem_transport_sync_all(void)
 {
-    RAISE_ERROR_STR("No path to peer");
-    return ENOSYS;
+    RETURN_ERROR_STR("No path to peer");
+    return ENOTSUP;
 }
 
 static inline
-void shmem_transport_broadcast(struct shmem_internal_team_t *team, void *dest,
-                               const void *source, size_t nelems, int PE_root,
-                               int datatype)
+int shmem_transport_broadcast(struct shmem_internal_team_t *team, void *dest,
+                              const void *source, size_t nelems, int PE_root,
+                              int datatype)
 {
-    RAISE_ERROR_STR("No path to peer");
-    return;
+    RETURN_ERROR_STR("No path to peer");
+    return ENOTSUP;
 }
 
 extern int shmem_transport_dtype_table[];

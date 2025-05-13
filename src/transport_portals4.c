@@ -178,6 +178,8 @@ static size_t shmem_transport_portals4_grow_size = 128;
 shmem_transport_ctx_t shmem_transport_ctx_default;
 shmem_ctx_t SHMEM_CTX_DEFAULT = (shmem_ctx_t) &shmem_transport_ctx_default;
 
+int shmem_transport_collectives = 0;
+
 static int
 shmem_transport_ctx_init(shmem_transport_ctx_t *ctx, long options, int id)
 {

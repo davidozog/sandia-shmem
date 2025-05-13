@@ -31,6 +31,8 @@
 shmem_transport_ctx_t shmem_transport_ctx_default;
 shmem_ctx_t SHMEM_CTX_DEFAULT = (shmem_ctx_t) &shmem_transport_ctx_default;
 
+int shmem_transport_collectives = 0;
+
 ucp_context_h shmem_transport_ucp_ctx;
 ucp_worker_h  shmem_transport_ucp_worker;
 ucp_config_t *shmem_transport_ucp_config;

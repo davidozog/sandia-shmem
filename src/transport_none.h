@@ -17,12 +17,53 @@
 #ifndef TRANSPORT_NONE_H
 #define TRANSPORT_NONE_H
 
+#include <errno.h>
+
 #include "shmem_internal.h"
 #include "transport.h"
 
-int shmem_transport_collectives = 0;
-typedef int shmem_transport_group_t = 0;
-typedef int shmem_transport_set_t = 0;
+extern int shmem_transport_collectives;
+typedef int shmem_transport_group_t;
+typedef int shmem_transport_set_t;
+
+#include "shmem_team.h"
+typedef struct shmem_internal_team_t shmem_internal_team_t;
+
+static inline
+int shmem_transport_collective_group_init(struct shmem_internal_team_t *team)
+{
+    RETURN_ERROR_STR("No path to peer");
+    return ENOTSUP;
+}
+
+static inline
+int shmem_transport_collective_group_fini(struct shmem_internal_team_t *team)
+{
+    RETURN_ERROR_STR("No path to peer");
+    return ENOTSUP;
+}
+static inline
+int shmem_transport_sync(struct shmem_internal_team_t *team)
+{
+    RETURN_ERROR_STR("No path to peer");
+    return ENOTSUP;
+}
+
+static inline
+int shmem_transport_sync_all(void)
+{
+    RETURN_ERROR_STR("No path to peer");
+    return ENOTSUP;
+}
+
+static inline
+int shmem_transport_broadcast(struct shmem_internal_team_t *team, void *dest,
+                               const void *source, size_t nelems, int PE_root,
+                               int datatype)
+{
+    RETURN_ERROR_STR("No path to peer");
+    return ENOTSUP;
+}
 
 /* Operations */
 enum shm_internal_op_t {
