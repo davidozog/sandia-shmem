@@ -386,6 +386,14 @@ void shmem_transport_probe(void)
 #if defined(ENABLE_MANUAL_PROGRESS)
 #  ifdef USE_THREAD_COMPLETION
     if (0 == pthread_mutex_trylock(&shmem_transport_ofi_progress_lock)) {
+        if (shmem_transport_ofi_single_ep) {
+        /* Armando: * could/should these two mutexes be combined in single-EP Mode?
+                    * Does USE_THREAD_COMPLETION have better perf than FI_THREAD_SAFE?
+                    *     It might not matter... someone has to lock.
+                    * Is it more efficient to trylock() and move on if taken ?
+                    * If so, then do we need to extend SHMEM_MUTEX_* API to trylock? */
+            SHMEM_TRANSPORT_OFI_CTX_LOCK(&shmem_transport_ctx_default);
+        }
 #  endif
         struct fi_cq_entry buf;
         /* Do not read a CQ entry in single-endpoint mode, just make progress. */
@@ -394,7 +402,11 @@ void shmem_transport_probe(void)
                              !shmem_transport_ofi_single_ep);
         if (!shmem_transport_ofi_single_ep && ret == 1)
             RAISE_WARN_STR("Unexpected event");
+
 #  ifdef USE_THREAD_COMPLETION
+        if (shmem_transport_ofi_single_ep) {
+            SHMEM_TRANSPORT_OFI_CTX_UNLOCK(&shmem_transport_ctx_default);
+        }
         pthread_mutex_unlock(&shmem_transport_ofi_progress_lock);
     }
 #  endif
@@ -483,6 +495,8 @@ shmem_transport_ofi_bounce_buffer_t * create_bounce_buffer(shmem_transport_ctx_t
 static inline
 void shmem_transport_put_quiet(shmem_transport_ctx_t* ctx)
 {
+    /* Armando: * Is this probe needed? Does it affect performance? */
+    shmem_transport_probe();
     SHMEM_TRANSPORT_OFI_CTX_LOCK(ctx);
 
     /* Wait for bounce buffered operations to complete */
@@ -512,10 +526,10 @@ void shmem_transport_put_quiet(shmem_transport_ctx_t* ctx)
         fail = fi_cntr_readerr(ctx->put_cntr);
         cnt = SHMEM_TRANSPORT_OFI_CNTR_READ(&ctx->pending_put_cntr);
 
-        shmem_transport_probe();
-
         if (success < cnt && fail == 0) {
             SHMEM_TRANSPORT_OFI_CTX_UNLOCK(ctx);
+            /* Armando: probe before spinlock/after spinlock? does it matter? */
+            shmem_transport_probe();
             SPINLOCK_BODY();
             SHMEM_TRANSPORT_OFI_CTX_LOCK(ctx);
         } else if (fail) {
@@ -536,6 +550,8 @@ void shmem_transport_put_quiet(shmem_transport_ctx_t* ctx)
     shmem_internal_assert(cnt == cnt_new);
 
     SHMEM_TRANSPORT_OFI_CTX_UNLOCK(ctx);
+    /* Armando: * Is this probe needed? Does it affect performance? */
+    shmem_transport_probe();
 }
 
 static inline
@@ -590,7 +606,10 @@ int try_again(shmem_transport_ctx_t *ctx, const int ret, uint64_t *polled) {
                 }
             }
 
-            shmem_transport_probe();
+            /* Armando: is it better to unlock/probe/unlock here, or just remove the probe entirely? */
+            //SHMEM_TRANSPORT_OFI_CTX_UNLOCK(ctx);
+            //shmem_transport_probe();
+            //SHMEM_TRANSPORT_OFI_CTX_LOCK(ctx);
 
             (*polled)++;
 
@@ -968,6 +987,8 @@ void shmem_transport_get_wait(shmem_transport_ctx_t* ctx)
     uint64_t success, fail, cnt, cnt_new;
     long poll_count = 0;
 
+    /* Armando: Is this probe needed? Does it affect performance? */
+    shmem_transport_probe();
     SHMEM_TRANSPORT_OFI_CTX_LOCK(ctx);
 
     while (poll_count < shmem_transport_ofi_get_poll_limit ||
@@ -976,10 +997,11 @@ void shmem_transport_get_wait(shmem_transport_ctx_t* ctx)
         fail = fi_cntr_readerr(ctx->get_cntr);
         cnt = SHMEM_TRANSPORT_OFI_CNTR_READ(&ctx->pending_get_cntr);
 
-        shmem_transport_probe();
 
         if (success < cnt && fail == 0) {
             SHMEM_TRANSPORT_OFI_CTX_UNLOCK(ctx);
+            /* Armando: probe before spinlock/after spinlock? does it matter? */
+            shmem_transport_probe();
             SPINLOCK_BODY();
             SHMEM_TRANSPORT_OFI_CTX_LOCK(ctx);
         } else if (fail) {
@@ -1000,6 +1022,8 @@ void shmem_transport_get_wait(shmem_transport_ctx_t* ctx)
     shmem_internal_assert(cnt == cnt_new);
 
     SHMEM_TRANSPORT_OFI_CTX_UNLOCK(ctx);
+    /* Armando: Is this probe needed? Does it affect performance? */
+    shmem_transport_probe();
 }
 
 
