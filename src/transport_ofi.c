@@ -1402,7 +1402,8 @@ struct fi_info *assign_nic_with_hwloc(struct fi_info *fabric, struct fi_info **p
             num_close_nics++;
         }
     }
-    DEBUG_MSG("Num. NICs w/ affinity to process: %zu\n", num_close_nics);
+    DEBUG_MSG("Num. NICs w/ affinity to process: %zu (%s)\n", num_close_nics,
+              last_added ? last_added->nic->device_attr->name : "no_name");
 
     if (!close_provs) {
         DEBUG_MSG("Could not detect any NICs with affinity to the process\n");
@@ -1432,6 +1433,10 @@ static int compare_nic_names(const void *f1, const void *f2)
 {
     const struct fi_info **fabric1 = (const struct fi_info **) f1;
     const struct fi_info **fabric2 = (const struct fi_info **) f2;
+    if (!(*fabric1)->nic->device_attr->name || !(*fabric2)->nic->device_attr->name) {
+        RAISE_WARN_STR("Encountered a NIC w/out a name, so inter-node NIC's might be out of order");
+        return 0;
+    }
     return strcmp((*fabric1)->nic->device_attr->name, (*fabric2)->nic->device_attr->name);
 }
 
